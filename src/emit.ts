@@ -60,7 +60,7 @@ export async function renderPromptText(
   // Render sections
   for (const section of result.sections) {
     const title = sectionNameToPascalCase(section.name);
-    output += `## ${title}\n\n${section.body}\n`;
+    output += `## ${title}\n\n${section.body}\n\n`;
   }
 
   return output;
