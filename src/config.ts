@@ -1,4 +1,4 @@
-import { join, dirname } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { DEFAULT_CONFIG } from "./types";
 import type { Config } from "./types";
 
@@ -6,10 +6,6 @@ export function getConfigPath(): string {
   const env = process.env.EVO_CONFIG;
   if (env) return env;
   return ".evo/config.yaml";
-}
-
-export function getConfigDir(): string {
-  return dirname(getConfigPath());
 }
 
 function parseYamlScalar(value: string): unknown {
@@ -39,7 +35,7 @@ function parseYamlScalar(value: string): unknown {
 export async function loadConfig(): Promise<Config> {
   const configPath = getConfigPath();
   // Resolve relative paths against the current working directory
-  const resolvedPath = configPath.startsWith("/") || configPath.startsWith("http")
+  const resolvedPath = isAbsolute(configPath) || configPath.startsWith("http")
     ? configPath
     : join(process.cwd(), configPath);
 
@@ -103,10 +99,10 @@ export async function loadConfig(): Promise<Config> {
     ...parsed,
   } as Config;
 
-  // Resolve relative paths against config directory
-  config.storeFile = join(getConfigDir(), config.storeFile);
-  config.emitDir = join(getConfigDir(), config.emitDir);
-  config.rootDirs = config.rootDirs.map((d) => join(getConfigDir(), d));
+  // Resolve relative paths against current working directory
+  if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);
+  if (!isAbsolute(config.emitDir)) config.emitDir = join(process.cwd(), config.emitDir);
+  config.rootDirs = config.rootDirs.map(d => isAbsolute(d) ? d : join(process.cwd(), d));
 
   return config;
 }
