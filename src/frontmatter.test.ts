@@ -55,6 +55,41 @@ describe("parseSections", () => {
     const sections = parseSections(body);
     expect(sections[0]!.name).toBe("quality-gates");
   });
+
+  test("ignores ## headings inside fenced code blocks", () => {
+    const body = [
+      "## Role",
+      "You are helpful.",
+      "",
+      "```markdown",
+      "## This Should Be Ignored",
+      "Nested content.",
+      "```",
+      "",
+      "## Constraints",
+      "Be safe.",
+    ].join("\n");
+    const sections = parseSections(body);
+    expect(sections).toHaveLength(2);
+    expect(sections[0]!.name).toBe("role");
+    expect(sections[1]!.name).toBe("constraints");
+  });
+
+  test("ignores ## headings inside tilde fenced code blocks", () => {
+    const body = [
+      "## Role",
+      "You are helpful.",
+      "",
+      "~~~",
+      "## Not a heading",
+      "~~~",
+      "",
+      "## Constraints",
+      "Be safe.",
+    ].join("\n");
+    const sections = parseSections(body);
+    expect(sections).toHaveLength(2);
+  });
 });
 
 describe("renderMarkdown", () => {

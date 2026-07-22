@@ -101,10 +101,14 @@ export function parseSections(body: string): Section[] {
   let currentSection: { name: string; lines: string[] } | null = null;
 
   const headingRegex = /^##\s+(.+)$/;
+  const fenceRegex = /^(```|~~~)/;
+  let inFencedBlock = false;
 
   for (const line of lines) {
+    inFencedBlock = line.match(fenceRegex) ? !inFencedBlock : inFencedBlock;
+
     const match = line.match(headingRegex);
-    if (match) {
+    if (match && !inFencedBlock) {
       // Flush previous section
       if (currentSection) {
         sections.push({
