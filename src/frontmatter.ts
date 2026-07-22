@@ -88,73 +88,176 @@ export function extractFrontmatter(
   return { metadata, body };
 }
 
+const fenceRegex = /^(```|~~~)/;
+const headingRegex = /^#{2,6}\s+(.+)$/;
+const headingLevelRegex = /^#+/;
+
+function headingName(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, "-");
+}
+
 /**
- * Split a markdown body section into an array of Section objects by `##` headings.
- *
- * Only `##` (exactly two `#`) headings are recognised — lines starting with
- * `###` or more `#` characters stay as regular text inside the current section.
+ * Parse child sections from lines[start..end-1] whose parent is at parentLevel.
+ * Returns sections parsed at this level and the index past the last consumed line.
  */
-export function parseSections(body: string): Section[] {
-  const lines = body.split("\n");
+function parseChildren(
+  lines: string[],
+  fenceState: boolean[],
+  start: number,
+  end: number,
+  parentLevel: number,
+): { sections: Section[]; nextLine: number } {
   const sections: Section[] = [];
-  let introLines: string[] = [];
-  let currentSection: { name: string; lines: string[] } | null = null;
+  let line = start;
 
-  const headingRegex = /^##\s+(.+)$/;
-  const fenceRegex = /^(```|~~~)/;
-  let inFencedBlock = false;
-
-  for (const line of lines) {
-    inFencedBlock = line.match(fenceRegex) ? !inFencedBlock : inFencedBlock;
-
-    const match = line.match(headingRegex);
-    if (match && !inFencedBlock) {
-      // Flush previous section
-      if (currentSection) {
-        sections.push({
-          name: currentSection.name,
-          body: currentSection.lines.join("\n").trim(),
-        });
-      }
-      // Flush intro
-      if (introLines.length > 0) {
-        sections.push({
-          name: "intro",
-          body: introLines.join("\n").trim(),
-        });
-        introLines = [];
-      }
-      // Start new section
-      currentSection = {
-        name: match[1]!.toLowerCase().replace(/\s+/g, "-"),
-        lines: [],
-      };
-    } else {
-      if (currentSection) {
-        currentSection.lines.push(line);
-      } else {
-        introLines.push(line);
-      }
+  while (line < end) {
+    if (fenceState[line]) {
+      line++;
+      continue;
     }
+
+    if (!lines[line]!.match(headingRegex)) {
+      // No more headings ahead — stop so parent collects trailing body
+      let hasHeadingAhead = false;
+      for (let k = line + 1; k < end; k++) {
+        if (fenceState[k]) continue;
+        if (lines[k]!.match(headingRegex)) { hasHeadingAhead = true; break; }
+      }
+      if (!hasHeadingAhead) break;
+      line++;
+      continue;
+    }
+
+    const headerLine = lines[line]!;
+    const match = headerLine.match(headingRegex);
+    if (!match) { line++; continue; }
+
+    const level = (headerLine.match(headingLevelRegex)![0]!.length) - 1;
+    if (level <= parentLevel) break;
+
+    const section: Section = {
+      name: headingName(match[1]!),
+      body: "",
+      level,
+    };
+
+    // Look ahead for first child heading or sibling heading
+    let bodyEnd = end;
+    let childIdx = -1;
+    let foundHeading = false;
+
+    for (let j = line + 1; j < end; j++) {
+      if (fenceState[j]) continue;
+      if (!lines[j]!.match(headingRegex)) continue;
+      foundHeading = true;
+      const jl = (lines[j]!.match(headingLevelRegex)![0]!.length) - 1;
+      bodyEnd = j;
+      if (jl > level) childIdx = j;
+      break;
+    }
+
+    // If no heading found ahead, find the first non-empty line to capture body
+    // so the parent can collect remaining lines as trailing body
+    if (!foundHeading) {
+      let firstBodyLine = line + 1;
+      while (firstBodyLine < end && (!lines[firstBodyLine] || lines[firstBodyLine]!.trim() === "")) {
+        firstBodyLine++;
+      }
+      bodyEnd = Math.min(firstBodyLine + 1, end);
+    }
+
+    section.body = lines.slice(line + 1, bodyEnd).join("\n").trim();
+
+    if (childIdx > 0) {
+      const { sections: children, nextLine: nl } = parseChildren(lines, fenceState, childIdx, end, level);
+      section.children = children;
+      line = nl;
+
+      // Collect trailing body after children (lines after last child but before next sibling)
+      const trailing: string[] = [];
+      while (line < end) {
+        if (fenceState[line]) { line++; continue; }
+        const tm = lines[line]!.match(headingRegex);
+        if (tm) {
+          const tl = (lines[line]!.match(headingLevelRegex)![0]!.length) - 1;
+          if (tl <= level) break;
+          // Heading at deeper level — it's another child we haven't parsed yet
+          break;
+        }
+        trailing.push(lines[line]!);
+        line++;
+      }
+      if (trailing.length > 0) {
+        section.body += "\n\n" + trailing.join("\n").trim();
+      }
+    } else {
+      // No children — advance past the section's body
+      line = bodyEnd;
+    }
+
+    sections.push(section);
   }
 
-  // Flush last section
-  if (currentSection) {
-    sections.push({
-      name: currentSection.name,
-      body: currentSection.lines.join("\n").trim(),
-    });
+  return { sections, nextLine: line };
+}
+
+export function parseSections(body: string): Section[] {
+  if (!body.trim()) return [];
+
+  const lines = body.split("\n");
+
+  // Pre-compute fence state for the entire document
+  const fenceState: boolean[] = new Array(lines.length);
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.match(fenceRegex)) fence = !fence;
+    fenceState[i] = fence;
   }
 
-  // Flush remaining intro
-  if (introLines.length > 0) {
+  // Phase 1: collect intro (text before first heading)
+  let line = 0;
+  while (line < lines.length) {
+    if (fenceState[line]) { line++; continue; }
+    if (lines[line]!.match(headingRegex)) break;
+    line++;
+  }
+
+  const sections: Section[] = [];
+  if (line > 0) {
     sections.push({
       name: "intro",
-      body: introLines.join("\n").trim(),
+      body: lines.slice(0, line).join("\n").trim(),
+      level: 0,
     });
   }
 
-  return sections;
+  // Phase 2: parse hierarchical tree
+  const { sections: bodySections } = parseChildren(lines, fenceState, line, lines.length, 0);
+  return [...sections, ...bodySections];
+}
+
+/**
+ * Convert a kebab-case section name to PascalCase (Title Case).
+ * Example: "quality-gates" → "Quality Gates", "role" → "Role"
+ */
+export function sectionNameToPascalCase(name: string): string {
+  return name
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function renderSection(section: Section): string {
+  const level = section.level ?? 1;
+  const hashes = "#".repeat(level + 1);
+  const displayName = sectionNameToPascalCase(section.name);
+
+  let result = `${hashes} ${displayName}`;
+  if (section.body) result += "\n\n" + section.body;
+  if (section.children?.length) {
+    for (const child of section.children) result += "\n\n" + renderSection(child);
+  }
+  return result + "\n\n";
 }
 
 /**
@@ -185,14 +288,6 @@ export function renderMarkdown(
     result += "---\n\n";
   }
 
-  // Emit each section
-  for (const section of sections) {
-    const displayName = section.name
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-    result += `## ${displayName}\n\n${section.body}\n`;
-  }
-
+  for (const section of sections) result += renderSection(section);
   return result;
 }

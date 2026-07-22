@@ -25,37 +25,54 @@ export class DepthExceededError extends Error {
 }
 
 /**
- * Merge parent and child sections.
+ * Merge parent and child section trees via recursive deep-clone merge.
  *
  * Algorithm:
  *   - For each child section:
- *     • If body is empty → remove any section with matching name from result
- *     • If a section with the same name exists → replace it (override)
- *     • Otherwise → append to end of result
- *   - Parent order is preserved; new child sections are appended at the end.
+ *     • If body is empty AND no children → remove matching section from result (prune)
+ *     • If a sibling with same name+level exists → deep-cloned override:
+ *       - Replace body if non-empty
+ *       - Recursively merge children if present
+ *     • Otherwise → deep-clone and append
+ *   - Parent order preserved; new child sections appended at end.
+ *   - Match key is (name, level) — siblings only.
  */
 export function mergeSections(parentSections: Section[], childSections: Section[]): Section[] {
-  const result: Section[] = [...parentSections];
+  const result = deepCloneSections(parentSections);
 
   for (const childSection of childSections) {
-    if (childSection.body === "") {
-      // Remove any section with matching name
-      const idx = result.findIndex((s) => s.name === childSection.name);
-      if (idx !== -1) {
-        result.splice(idx, 1);
-      }
+    if (childSection.body === "" && (!childSection.children || childSection.children.length === 0)) {
+      const idx = result.findIndex((s) => s.name === childSection.name && s.level === childSection.level);
+      if (idx !== -1) result.splice(idx, 1);
       continue;
     }
 
-    const existingIdx = result.findIndex((s) => s.name === childSection.name);
+    const existingIdx = result.findIndex((s) => s.name === childSection.name && s.level === childSection.level);
     if (existingIdx !== -1) {
-      result[existingIdx] = childSection; // override
+      const existing = result[existingIdx]!;
+      if (childSection.body !== "") existing.body = childSection.body;
+      if (childSection.children && childSection.children.length > 0) {
+        existing.children = mergeSections(existing.children || [], childSection.children);
+      }
     } else {
-      result.push(childSection); // append
+      result.push(deepCloneSection(childSection));
     }
   }
 
   return result;
+}
+
+function deepCloneSection(section: Section): Section {
+  return {
+    name: section.name,
+    body: section.body,
+    level: section.level,
+    children: section.children ? deepCloneSections(section.children) : undefined,
+  };
+}
+
+function deepCloneSections(sections: Section[]): Section[] {
+  return sections.map(deepCloneSection);
 }
 
 /**

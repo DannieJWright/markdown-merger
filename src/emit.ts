@@ -3,17 +3,20 @@
 
 import { resolvePrompt, topologicalSort } from "./resolve";
 import { readStore } from "./store";
-import type { Config, PromptRecord } from "./types";
+import { sectionNameToPascalCase } from "./frontmatter";
+import type { Config, PromptRecord, Section } from "./types";
 
-/**
- * Convert a kebab-case section name to PascalCase.
- * Example: "quality-gates" → "Quality Gates", "role" → "Role"
- */
-function sectionNameToPascalCase(name: string): string {
-  return name
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+function renderSection(section: Section): string {
+  const level = section.level ?? 1;
+  const hashes = "#".repeat(level + 1);
+  const displayName = sectionNameToPascalCase(section.name);
+
+  let result = `${hashes} ${displayName}`;
+  if (section.body) result += "\n\n" + section.body;
+  if (section.children?.length) {
+    for (const child of section.children) result += "\n\n" + renderSection(child);
+  }
+  return result + "\n\n";
 }
 
 /**
@@ -22,7 +25,7 @@ function sectionNameToPascalCase(name: string): string {
  * 1. Resolve the prompt (with inheritance) via resolvePrompt
  * 2. Build frontmatter: copy resolved frontmatter, delete `extends` and `abstract`
  * 3. If frontmatter has keys: render `---\n{yaml lines}\n---\n\n`
- * 4. For each section: render `## {PascalCase name}\n\n{section.body}\n`
+ * 4. For each section (depth-first, respecting level): render with correct heading depth
  * 5. Return full string
  */
 export async function renderPromptText(
@@ -31,38 +34,25 @@ export async function renderPromptText(
   maxDepth: number,
 ): Promise<string> {
   const result = await resolvePrompt(storePath, name, maxDepth);
-
-  // Build frontmatter without extends and abstract
   const fm = { ...result.frontmatter };
   delete fm.extends;
   delete fm.abstract;
 
-  // Render frontmatter block if there are keys
   let output = "";
   const fmKeys = Object.keys(fm);
   if (fmKeys.length > 0) {
     output += "---\n";
     for (const key of fmKeys) {
       const value = fm[key];
-      if (typeof value === "string") {
-        output += `${key}: ${value}\n`;
-      } else if (typeof value === "boolean") {
-        output += `${key}: ${value}\n`;
-      } else if (Array.isArray(value)) {
-        output += `${key}: [${value.map((v) => (typeof v === "string" ? `'${v}'` : String(v))).join(", ")}]\n`;
-      } else {
-        output += `${key}: ${JSON.stringify(value)}\n`;
-      }
+      if (typeof value === "string") output += `${key}: ${value}\n`;
+      else if (typeof value === "boolean") output += `${key}: ${value}\n`;
+      else if (Array.isArray(value)) output += `${key}: [${value.map((v) => (typeof v === "string" ? `'${v}'` : String(v))).join(", ")}]\n`;
+      else output += `${key}: ${JSON.stringify(value)}\n`;
     }
     output += "---\n\n";
   }
 
-  // Render sections
-  for (const section of result.sections) {
-    const title = sectionNameToPascalCase(section.name);
-    output += `## ${title}\n\n${section.body}\n\n`;
-  }
-
+  for (const section of result.sections) output += renderSection(section);
   return output;
 }
 

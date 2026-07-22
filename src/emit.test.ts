@@ -66,6 +66,19 @@ describe("renderPromptText", () => {
     // and the start of the next section header.
     expect(output).toContain("You are a coding assistant.\n\n## Constraints");
   });
+
+  test("renders nested sections with correct heading levels", async () => {
+    await updateOrCreate(storePath, "nested", "test", {
+      sections: [{ name: "role", body: "Intro.", level: 1, children: [
+        { name: "identity", body: "I am an AI.", level: 2 },
+        { name: "behavior", body: "Be helpful.", level: 2 },
+      ]}],
+      frontmatter: { name: "Nested Agent" },
+    });
+    const output = await renderPromptText(storePath, "nested", 5);
+    expect(output).toContain("### Identity");
+    expect(output).not.toMatch(/^  /m);
+  });
 });
 
 describe("emitAll", () => {

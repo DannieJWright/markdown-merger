@@ -40,6 +40,113 @@ describe("mergeSections", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.name).toBe("role");
   });
+
+  test("overrides ### subsection, siblings carry over", () => {
+    const parent: Section[] = [{ name: "role", body: "role intro", level: 1, children: [
+      { name: "identity", body: "parent identity", level: 2 },
+      { name: "behavior", body: "parent behavior", level: 2 },
+    ]}];
+    const child: Section[] = [{ name: "role", body: "child role", level: 1, children: [
+      { name: "identity", body: "child identity", level: 2 },
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.body).toBe("child role");
+    expect(result[0]!.children).toHaveLength(2);
+    expect(result[0]!.children![0]!.body).toBe("child identity");
+    expect(result[0]!.children![1]!.body).toBe("parent behavior");
+  });
+
+  test("removes ### with empty body and no children", () => {
+    const parent: Section[] = [{ name: "role", body: "intro", level: 1, children: [
+      { name: "identity", body: "id", level: 2 },
+      { name: "behavior", body: "behav", level: 2 },
+    ]}];
+    const child: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "", level: 2 },
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.children).toHaveLength(1);
+    expect(result[0]!.children![0]!.name).toBe("behavior");
+  });
+
+  test("empty body WITH children does NOT remove", () => {
+    const parent: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "parent id", level: 2, children: [
+        { name: "primary", body: "parent primary", level: 3 },
+      ]},
+    ]}];
+    const child: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "", level: 2, children: [
+        { name: "primary", body: "child primary", level: 3 },
+      ]},
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.children![0]!.body).toBe("parent id");
+    expect(result[0]!.children![0]!.children![0]!.body).toBe("child primary");
+  });
+
+  test("grandchild removal cascades", () => {
+    const parent: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "id", level: 2, children: [
+        { name: "primary", body: "p", level: 3 },
+        { name: "secondary", body: "s", level: 3 },
+      ]},
+    ]}];
+    const child: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "", level: 2 },
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.children).toHaveLength(0);
+  });
+
+  test("adds new ###, parent children carry over", () => {
+    const parent: Section[] = [{ name: "role", body: "intro", level: 1, children: [
+      { name: "identity", body: "id", level: 2 },
+    ]}];
+    const child: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "capabilities", body: "can help", level: 2 },
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.children).toHaveLength(2);
+    expect(result[0]!.children![1]!.name).toBe("capabilities");
+  });
+
+  test("deep nesting: override at #### level 3", () => {
+    const parent: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "parent id", level: 2, children: [
+        { name: "primary", body: "parent primary", level: 3 },
+        { name: "secondary", body: "parent secondary", level: 3 },
+      ]},
+    ]}];
+    const child: Section[] = [{ name: "role", body: "", level: 1, children: [
+      { name: "identity", body: "child id", level: 2, children: [
+        { name: "primary", body: "child primary", level: 3 },
+      ]},
+    ]}];
+    const result = mergeSections(parent, child);
+    const id = result[0]!.children![0]!;
+    expect(id.body).toBe("child id");
+    expect(id.children).toHaveLength(2);
+    expect(id.children![0]!.body).toBe("child primary");
+    expect(id.children![1]!.body).toBe("parent secondary");
+  });
+
+  test("cross-level override: child ## Role body + ### Identity body, parent ### Behavior carries over", () => {
+    const parent: Section[] = [{ name: "role", body: "parent role", level: 1, children: [
+      { name: "identity", body: "parent identity", level: 2 },
+      { name: "behavior", body: "parent behavior", level: 2 },
+    ]}];
+    const child: Section[] = [{ name: "role", body: "child role", level: 1, children: [
+      { name: "identity", body: "child identity", level: 2 },
+    ]}];
+    const result = mergeSections(parent, child);
+    expect(result[0]!.body).toBe("child role");
+    expect(result[0]!.children).toHaveLength(2);
+    expect(result[0]!.children![0]!.name).toBe("identity");
+    expect(result[0]!.children![0]!.body).toBe("child identity");
+    expect(result[0]!.children![1]!.name).toBe("behavior");
+    expect(result[0]!.children![1]!.body).toBe("parent behavior");
+  });
 });
 
 describe("resolvePrompt", () => {

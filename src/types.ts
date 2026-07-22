@@ -1,6 +1,8 @@
 export interface Section {
   name: string;
   body: string;
+  level?: number;
+  children?: Section[];
 }
 
 export interface PromptRecord {
