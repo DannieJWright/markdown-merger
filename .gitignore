@@ -1,0 +1,14 @@
+# Local RAG
+models/
+
+# Deepwork state
+.slim/deepwork/
+.superpowers/
+
+# Project files
+node_modules/
+dist/
+
+# Generated files
+.evo/
+agents-root/

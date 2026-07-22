@@ -1,0 +1,18 @@
+{
+  "name": "evo-ai",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "evo": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun src/index.ts build",
+    "emit": "bun src/index.ts emit",
+    "render": "bun src/index.ts render",
+    "stats": "bun src/index.ts stats",
+    "doctor": "bun src/index.ts doctor",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  }
+}
