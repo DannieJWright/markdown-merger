@@ -52,6 +52,20 @@ describe("renderPromptText", () => {
     const output = await renderPromptText(storePath, "base", 5);
     expect(output).not.toContain("abstract");
   });
+
+  test("has blank line between consecutive sections", async () => {
+    await updateOrCreate(storePath, "multi-section", "test", {
+      sections: [
+        { name: "role", body: "You are a coding assistant." },
+        { name: "constraints", body: "Think carefully." },
+      ],
+      frontmatter: {},
+    });
+    const output = await renderPromptText(storePath, "multi-section", 5);
+    // There should be a blank line between the end of one section's body
+    // and the start of the next section header.
+    expect(output).toContain("You are a coding assistant.\n\n## Constraints");
+  });
 });
 
 describe("emitAll", () => {
