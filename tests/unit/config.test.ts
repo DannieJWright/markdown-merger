@@ -36,8 +36,25 @@ describe("loadConfig", () => {
   });
 
   test("reads project name from config", async () => {
-    const config = await loadConfig();
-    expect(config.project).toBe("evo-ai");
+    const tmpDir = join(tmpdir(), "evo-project-test-" + Math.random().toString(36).slice(2));
+    const cfgPath = join(tmpDir, "cfg.yaml");
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(cfgPath, [
+      `project: evo-ai`,
+      `version: "1"`,
+      `storeFile: ${join(tmpDir, "store.jsonl")}`,
+    ].join("\n"));
+
+    const origEnv = process.env.EVO_CONFIG;
+    try {
+      process.env.EVO_CONFIG = cfgPath;
+      const config = await loadConfig();
+      expect(config.project).toBe("evo-ai");
+    } finally {
+      if (origEnv === undefined) delete process.env.EVO_CONFIG;
+      else process.env.EVO_CONFIG = origEnv;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
