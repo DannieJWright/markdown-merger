@@ -91,6 +91,59 @@ describe("renderText", () => {
     expect(output).not.toMatch(/\n\n+$/);
   });
 
+  test('has exactly one blank line between sibling child sections', async () => {
+    await updateOrCreate(storePath, "nested-spaces", "test", {
+      sections: [{ name: "role", body: "Intro.", level: 1, children: [
+        { name: "identity", body: "I am an AI.", level: 2 },
+        { name: "behavior", body: "Be helpful.", level: 2 },
+      ]}],
+      frontmatter: {},
+    });
+    const output = await renderText(storePath, "nested-spaces", 5);
+    // Between two child sections: exactly \n\n — not \n\n\n or more
+    expect(output).toMatch(/I am an AI\.\n\n### Behavior/);
+    expect(output).not.toMatch(/AI\.\n\n\n/);
+  });
+
+  test('no trailing blank lines at end of output', async () => {
+    await updateOrCreate(storePath, "trailing-newline", "test", {
+      sections: [
+        { name: "role", body: "You are helpful." },
+      ],
+      frontmatter: {},
+    });
+    const output = await renderText(storePath, "trailing-newline", 5);
+    expect(output).not.toMatch(/\n\n+$/);
+    // Should end with a single newline
+    expect(output).toMatch(/helpful\.\n$/);
+  });
+
+  test('deeply nested sections maintain correct spacing at child boundaries', async () => {
+    await updateOrCreate(storePath, "deep-nested", "test", {
+      sections: [{ name: "root", body: "Root.", level: 1, children: [
+        { name: "child-one", body: "Child one.", level: 2, children: [
+          { name: "grandchild-a", body: "Grandchild A.", level: 3 },
+          { name: "grandchild-b", body: "Grandchild B.", level: 3 },
+        ]},
+        { name: "child-two", body: "Child two.", level: 2 },
+      ]}],
+      frontmatter: {},
+    });
+    const output = await renderText(storePath, "deep-nested", 5);
+    // Between grandchild A and grandchild B (siblings within child-one): exactly \n\n
+    expect(output).toMatch(/Grandchild A\.\n\n#### Grandchild B/);
+    expect(output).not.toMatch(/Grandchild A\.\n\n\n/);
+    // Between child-one last descendant and child-two: exactly \n\n
+    expect(output).toMatch(/Grandchild B\.\n\n### Child Two/);
+    expect(output).not.toMatch(/Grandchild B\.\n\n\n/);
+    // Verify all sections present
+    expect(output).toContain("## Root");
+    expect(output).toContain("### Child One");
+    expect(output).toContain("#### Grandchild A");
+    expect(output).toContain("#### Grandchild B");
+    expect(output).toContain("### Child Two");
+  });
+
   test("renders nested sections with correct heading levels", async () => {
     await updateOrCreate(storePath, "nested", "test", {
       sections: [{ name: "role", body: "Intro.", level: 1, children: [
