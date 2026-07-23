@@ -1,4 +1,5 @@
-import { appendFile } from "node:fs/promises";
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { PromptRecord } from "./types";
 
 /**
@@ -33,6 +34,7 @@ export async function readStore(storePath: string): Promise<PromptRecord[]> {
  */
 export async function appendRecord(storePath: string, record: PromptRecord): Promise<void> {
   const line = JSON.stringify(record) + "\n";
+  await mkdir(dirname(storePath), { recursive: true });
   await appendFile(storePath, line);
 }
 
