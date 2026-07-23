@@ -276,3 +276,37 @@ describe("renderMarkdown", () => {
     expect(secondParse[0]!.children![0]!.children![0]!.body).toBe(firstParse[0]!.children![0]!.children![0]!.body);
   });
 });
+
+describe("renderMarkdown spacing", () => {
+  test('has exactly one blank line between sibling child sections', () => {
+    const sections: Section[] = [
+      { name: "role", body: "You are a coding assistant.", level: 1, children: [
+        { name: "identity", body: "I am an AI.", level: 2 },
+        { name: "behavior", body: "Be helpful.", level: 2 },
+      ]},
+    ];
+    const output = renderMarkdown({}, sections);
+    expect(output).toMatch(/I am an AI\.\n\n### Behavior/);
+    expect(output).not.toMatch(/AI\.\n\n\n/);
+  });
+
+  test('has exactly one blank line between child body and sibling section', () => {
+    const sections: Section[] = [
+      { name: "role", body: "Intro.", level: 1, children: [
+        { name: "child", body: "Child body.", level: 2 },
+      ]},
+      { name: "constraints", body: "Think carefully.", level: 1 },
+    ];
+    const output = renderMarkdown({}, sections);
+    expect(output).toMatch(/Child body\.\n\n## Constraints/);
+    expect(output).not.toMatch(/body\.\n\n\n/);
+  });
+
+  test('no trailing blank lines at end of output', () => {
+    const sections: Section[] = [
+      { name: "role", body: "You are helpful." },
+    ];
+    const output = renderMarkdown({}, sections);
+    expect(output).not.toMatch(/\n\n+$/);
+  });
+});

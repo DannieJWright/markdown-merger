@@ -10,21 +10,10 @@ Base child deletable.
 
 Base second grandchild deletable.
 
-
-
-
-
 ### Second Child Deletable
 
 Base second child deletable.
 
-
-
 #### Second Grandchild Deletable
 
 Base second grandchild deletable
-
-
-
-
-

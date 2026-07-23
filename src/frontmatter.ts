@@ -188,7 +188,10 @@ function parseChildren(
         line++;
       }
       if (trailing.length > 0) {
-        section.body += "\n\n" + trailing.join("\n").trim();
+        const trailingText = trailing.join("\n").trim();
+        if (trailingText) {
+          section.body += "\n\n" + trailingText;
+        }
       }
     } else {
       // No children — advance past the section's body
@@ -257,7 +260,7 @@ function renderSection(section: Section): string {
   if (section.children?.length) {
     for (const child of section.children) result += "\n\n" + renderSection(child);
   }
-  return result + "\n\n";
+  return result;
 }
 
 /**
@@ -288,6 +291,9 @@ export function renderMarkdown(
     result += "---\n\n";
   }
 
-  for (const section of sections) result += renderSection(section);
+  const sectionTexts = sections.map(renderSection);
+  if (sectionTexts.length > 0) {
+    result += sectionTexts.join("\n\n") + "\n";
+  }
   return result;
 }

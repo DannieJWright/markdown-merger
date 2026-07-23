@@ -6,8 +6,6 @@ You are a coding assistant specializing in TypeScript.
 
 Base sub-role
 
-
-
 ## Constraints
 
 Think carefully before answering.
@@ -16,17 +14,10 @@ Think carefully before answering.
 
 Base direct grandchild constraint.
 
-
-
 ### Child Constraint
 
 Base child constraint.
 
-
-
 ### Some Subconstraint
 
 Be super duper careful.
-
-
-
