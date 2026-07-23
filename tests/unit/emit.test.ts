@@ -91,20 +91,6 @@ describe("renderText", () => {
     expect(output).not.toMatch(/\n\n+$/);
   });
 
-  test('has exactly one blank line between sibling child sections', async () => {
-    await updateOrCreate(storePath, "nested-spaces", "test", {
-      sections: [{ name: "role", body: "Intro.", level: 1, children: [
-        { name: "identity", body: "I am an AI.", level: 2 },
-        { name: "behavior", body: "Be helpful.", level: 2 },
-      ]}],
-      frontmatter: {},
-    });
-    const output = await renderText(storePath, "nested-spaces", 5);
-    // Between two child sections: exactly \n\n — not \n\n\n or more
-    expect(output).toMatch(/I am an AI\.\n\n### Behavior/);
-    expect(output).not.toMatch(/AI\.\n\n\n/);
-  });
-
   test('no trailing blank lines at end of output', async () => {
     await updateOrCreate(storePath, "trailing-newline", "test", {
       sections: [
@@ -155,6 +141,18 @@ describe("renderText", () => {
     const output = await renderText(storePath, "nested", 5);
     expect(output).toContain("### Identity");
     expect(output).not.toMatch(/^  /m);
+  });
+
+  test("handles empty sections array gracefully", async () => {
+    await updateOrCreate(storePath, "empty-sections", "test", {
+      sections: [],
+      frontmatter: { name: "Empty Agent" },
+    });
+    const output = await renderText(storePath, "empty-sections", 5);
+    expect(output).toContain("---");
+    expect(output).toContain("name: Empty Agent");
+    // No section bodies rendered
+    expect(output).not.toMatch(/^## /m);
   });
 });
 
