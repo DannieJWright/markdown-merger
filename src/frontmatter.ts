@@ -257,7 +257,7 @@ function renderSection(section: Section): string {
   if (section.children?.length) {
     for (const child of section.children) result += "\n\n" + renderSection(child);
   }
-  return result + "\n\n";
+  return result;
 }
 
 /**
@@ -288,6 +288,9 @@ export function renderMarkdown(
     result += "---\n\n";
   }
 
-  for (const section of sections) result += renderSection(section);
+  const sectionTexts = sections.map(renderSection);
+  if (sectionTexts.length > 0) {
+    result += sectionTexts.join("\n\n") + "\n";
+  }
   return result;
 }
