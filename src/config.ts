@@ -34,7 +34,6 @@ function parseYamlScalar(value: string): unknown {
 
 export async function loadConfig(): Promise<Config> {
   const configPath = getConfigPath();
-  // Resolve relative paths against the current working directory
   const resolvedPath = isAbsolute(configPath) || configPath.startsWith("http")
     ? configPath
     : join(process.cwd(), configPath);
@@ -45,40 +44,58 @@ export async function loadConfig(): Promise<Config> {
     const text = await Bun.file(resolvedPath).text();
     const lines = text.split("\n");
 
-    // Track pending key for multi-line array values
     let pendingKey: string | null = null;
     let pendingArray: string[] = [];
+    let pendingObject: Record<string, string> | null = null;
 
     function flushPending(): void {
       if (pendingKey !== null) {
-        parsed[pendingKey] = pendingArray;
+        if (pendingObject !== null) {
+          parsed[pendingKey] = pendingObject;
+          pendingObject = null;
+        } else if (pendingArray.length > 0) {
+          parsed[pendingKey] = pendingArray;
+        }
         pendingKey = null;
         pendingArray = [];
       }
     }
 
     for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) continue;
+      const trimmed = rawLine.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
 
-      // List item continuation (starts with -)
-      if (line.startsWith("- ") && pendingKey !== null) {
-        pendingArray.push(line.slice(2).trim());
-        continue;
+      const indentLevel = rawLine.search(/\S/);
+
+      // Indented lines — check BEFORE flush (handles both arrays and objects)
+      if (indentLevel > 0 && pendingKey !== null) {
+        // List item continuation (starts with - at indented level)
+        if (trimmed.startsWith("- ")) {
+          pendingArray.push(trimmed.slice(2).trim());
+          continue;
+        }
+
+        // Indented key-value pair (nested object)
+        const indentedKeyValue = trimmed.match(/^(\S+):\s*(.+)$/);
+        if (indentedKeyValue) {
+          if (pendingObject === null) {
+            pendingObject = {};
+          }
+          pendingObject[indentedKeyValue[1]!] = indentedKeyValue[2]!.trim();
+          continue;
+        }
       }
 
-      // Flush any pending array before starting a new key
+      // Top-level key — flush pending before starting new key
       flushPending();
 
-      // Key: value line
-      const colonIdx = line.indexOf(":");
+      const colonIdx = trimmed.indexOf(":");
       if (colonIdx === -1) continue;
 
-      const key = line.slice(0, colonIdx).trim();
-      let valueStr = line.slice(colonIdx + 1).trim();
+      const key = trimmed.slice(0, colonIdx).trim();
+      let valueStr = trimmed.slice(colonIdx + 1).trim();
 
       if (valueStr === "") {
-        // Value on next line(s) — start collecting list items
         pendingKey = key;
         pendingArray = [];
         continue;
@@ -87,21 +104,33 @@ export async function loadConfig(): Promise<Config> {
       parsed[key] = parseYamlScalar(valueStr);
     }
 
-    // Flush any remaining pending array
     flushPending();
+
+    // Migration warning: detect old emitDir format
+    if (typeof parsed.emitDir === "string") {
+      console.warn(
+        "Config uses deprecated 'emitDir'. Replace with 'emitDirs: { default: <path> }'."
+      );
+    }
   } catch {
     // File may not exist; fall back to defaults
   }
 
-  // Spread defaults first, overlay parsed values
   const config: Config = {
     ...DEFAULT_CONFIG,
     ...parsed,
   } as Config;
 
-  // Resolve relative paths against current working directory
   if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);
-  if (!isAbsolute(config.emitDir)) config.emitDir = join(process.cwd(), config.emitDir);
+
+  const emitDirs = config.emitDirs;
+  for (const typeKey of Object.keys(emitDirs)) {
+    const dir = emitDirs[typeKey];
+    if (dir && !isAbsolute(dir)) {
+      emitDirs[typeKey] = join(process.cwd(), dir);
+    }
+  }
+
   config.rootDirs = config.rootDirs.map(d => isAbsolute(d) ? d : join(process.cwd(), d));
 
   return config;

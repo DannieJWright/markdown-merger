@@ -1,13 +1,13 @@
-# Justfile for evo-ai — agent prompt management with inheritance
+# Justfile for evo-ai — markdown file processing with inheritance
 #
 # Setup:
 #   1. Create .evo/config.yaml with your project config
-#   2. Create .md agent files in your rootDirs
-#   3. Run: just build          # import agents into store
+#   2. Create .md files with type and extends in frontmatter
+#   3. Run: just build          # import modules into store
 #   4. Run: just emit           # generate merged output files
 #
 # Inheritance:
-#   Agent .md files can extend other agents via frontmatter:
+#   Module .md files can extend other modules via frontmatter:
 #     ---
 #     extends: [system-base, traits/caution]
 #     abstract: false
@@ -20,15 +20,15 @@
 default:
 	@just --list
 
-# Import agent .md files from rootDirs into the JSONL store
+# Import .md files from rootDirs into the JSONL store
 build:
 	bun ./src/index.ts build
 
-# Emit merged agent .md files (--dry-run to preview)
+# Emit merged .md files (--dry-run to preview)
 emit *args:
 	bun ./src/index.ts emit {{args}}
 
-# Render and print a single agent with inheritance resolved
+# Render and print a single module with inheritance resolved
 render args:
 	bun ./src/index.ts render {{args}}
 
@@ -36,7 +36,7 @@ render args:
 doctor:
 	bun ./src/index.ts doctor
 
-# Show agent counts: total, abstract, and leaf agents
+# Show module counts: total, abstract, and leaf modules
 stats:
 	bun ./src/index.ts stats
 

@@ -11,6 +11,7 @@ export interface PromptRecord {
   version: number;
   sections: Section[];
   extends?: string[];
+  type?: string;
   frontmatter: Record<string, unknown>;
   abstract: boolean;
   status: "draft" | "active";
@@ -23,7 +24,7 @@ export interface Config {
   version: string;
   maxInheritDepth: number;
   storeFile: string;
-  emitDir: string;
+  emitDirs: Record<string, string>;
   rootDirs: string[];
 }
 
@@ -38,6 +39,6 @@ export const DEFAULT_MAX_INHERIT_DEPTH = 5;
 export const DEFAULT_CONFIG: Omit<Config, "project" | "version"> = {
   maxInheritDepth: DEFAULT_MAX_INHERIT_DEPTH,
   storeFile: "prompts.jsonl",
-  emitDir: "output-agents",
+  emitDirs: { default: "output" },
   rootDirs: [".evo/agents-root/input"],
 };

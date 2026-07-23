@@ -1,7 +1,7 @@
 // Adapted from Canopy (https://github.com/jayminwest/canopy), src/render.ts
 // Original Copyright (c) 2026 Canopy contributors, MIT License
 
-import { resolvePrompt, topologicalSort } from "./resolve";
+import { resolve, topologicalSort } from "./resolve";
 import { readStore } from "./store";
 import { sectionNameToPascalCase } from "./frontmatter";
 import type { Config, PromptRecord, Section } from "./types";
@@ -20,23 +20,24 @@ function renderSection(section: Section): string {
 }
 
 /**
- * Render a resolved agent as a markdown string.
+ * Render a resolved module as a markdown string.
  *
- * 1. Resolve the prompt (with inheritance) via resolvePrompt
- * 2. Build frontmatter: copy resolved frontmatter, delete `extends` and `abstract`
+ * 1. Resolve the module (with inheritance) via resolve
+ * 2. Build frontmatter: copy resolved frontmatter, delete `extends`, `abstract`, and `type`
  * 3. If frontmatter has keys: render `---\n{yaml lines}\n---\n\n`
  * 4. For each section (depth-first, respecting level): render with correct heading depth
  * 5. Return full string
  */
-export async function renderPromptText(
+export async function renderText(
   storePath: string,
   name: string,
   maxDepth: number,
 ): Promise<string> {
-  const result = await resolvePrompt(storePath, name, maxDepth);
+  const result = await resolve(storePath, name, maxDepth);
   const fm = { ...result.frontmatter };
   delete fm.extends;
   delete fm.abstract;
+  delete fm.type;
 
   let output = "";
   const fmKeys = Object.keys(fm);
@@ -71,21 +72,22 @@ function deduplicateRecords(records: PromptRecord[]): PromptRecord[] {
 }
 
 /**
- * Emit all resolved agents as markdown files.
+ * Emit all resolved modules as markdown files.
  *
  * 1. Read all records, deduplicate to latest version per name
  * 2. Topological sort to get processing order
- * 3. For each agent in topological order (skipping abstract):
- *    - Call renderPromptText
- *    - Write to ${emitDir}/${name}.md (replace / with _ in name)
+ * 3. For each module in topological order (skipping abstract):
+ *    - Resolve via resolve
+ *    - Route to correct dir based on module type
+ *    - Write to ${targetDir}/${name}.md (replace / with _ in name)
  * 4. If dryRun: print "Would write: {path}" instead of writing
  * 5. Return array of written file paths
- * 6. Error handling: if renderPromptText fails for one agent, log to stderr
- *    but continue processing remaining agents
+ * 6. Error handling: if renderText fails for one module, log to stderr
+ *    but continue processing remaining modules
  */
 export async function emitAll(
   storePath: string,
-  emitDir: string,
+  emitDirs: Record<string, string>,
   config: Config,
   dryRun: boolean = false,
 ): Promise<string[]> {
@@ -112,32 +114,42 @@ export async function emitAll(
     recordMap.set(record.name, record);
   }
 
-  // Step 3: Process in topological order, skipping abstract agents
+  // Step 3: Process in topological order, skipping abstract modules
   const writtenPaths: string[] = [];
-  const failedAgents: string[] = [];
+  const failedModules: string[] = [];
 
   for (const name of sortedNames) {
     const record = recordMap.get(name);
     if (!record) continue;
 
-    // Skip abstract agents
+    // Skip abstract modules
     if (record.abstract) {
       continue;
     }
 
-    // Render the prompt text
+    // Route by type
+    if (!record.type) {
+      continue;
+    }
+    const targetDir = emitDirs[record.type];
+    if (!targetDir) {
+      console.error(`No emit dir configured for type "${record.type}" in module "${name}", skipping`);
+      continue;
+    }
+
+    // Render the module text
     let text: string;
     try {
-      text = await renderPromptText(storePath, name, config.maxInheritDepth);
+      text = await renderText(storePath, name, config.maxInheritDepth);
     } catch (err) {
       console.error(`Failed to render "${name}": ${err instanceof Error ? err.message : String(err)}`);
-      failedAgents.push(name);
+      failedModules.push(name);
       continue;
     }
 
     // Build output filename: replace / with _
     const safeName = name.replace(/\//g, "_");
-    const filePath = `${emitDir}/${safeName}.md`;
+    const filePath = `${targetDir}/${safeName}.md`;
 
     // Step 4/5: dryRun or write
     if (dryRun) {
@@ -156,9 +168,9 @@ export async function emitAll(
   }
 
   // Report failures
-  if (failedAgents.length > 0) {
+  if (failedModules.length > 0) {
     console.error(
-      `\nEmit completed with ${failedAgents.length} failure(s): ${failedAgents.join(", ")}`,
+      `\nFailed to render ${failedModules.length} module(s): ${failedModules.join(", ")}`,
     );
   }
 

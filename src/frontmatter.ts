@@ -271,7 +271,7 @@ export function renderMarkdown(
 
   // Emit frontmatter block if there are keys (excluding extends/abstract)
   const relevantKeys = Object.keys(frontmatter).filter(
-    (k) => k !== "extends" && k !== "abstract",
+    (k) => k !== "extends" && k !== "abstract" && k !== "type",
   );
   if (relevantKeys.length > 0) {
     result += "---\n";

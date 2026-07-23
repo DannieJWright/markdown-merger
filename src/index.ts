@@ -3,7 +3,7 @@
 import { loadConfig, getConfigPath } from "./config";
 import { build } from "./import";
 import { topologicalSort } from "./resolve";
-import { emitAll, renderPromptText } from "./emit";
+import { emitAll, renderText } from "./emit";
 import { readStore } from "./store";
 import type { Config, PromptRecord } from "./types";
 
@@ -22,11 +22,11 @@ async function main(): Promise<void> {
     }
     case "emit": {
       const dryRun = args[1] === "--dry-run";
-      const paths = await emitAll(storePath, config.emitDir, config, dryRun);
+      const paths = await emitAll(storePath, config.emitDirs, config, dryRun);
       if (dryRun) {
-        console.log(`${paths.length} file(s) would be written to ${config.emitDir}/`);
+        console.log(`${paths.length} file(s) would be written`);
       } else {
-        console.log(`Emitted ${paths.length} file(s) to ${config.emitDir}/`);
+        console.log(`Emitted ${paths.length} file(s)`);
       }
       break;
     }
@@ -36,7 +36,7 @@ async function main(): Promise<void> {
         console.error("Usage: evo render <module>");
         process.exit(1);
       }
-      console.log(await renderPromptText(storePath, name, config.maxInheritDepth));
+      console.log(await renderText(storePath, name, config.maxInheritDepth));
       break;
     }
     case "stats": {
@@ -110,10 +110,10 @@ async function main(): Promise<void> {
       console.log(`Usage: evo <command>
 
 Commands:
-  build               Import agent .md files into the JSONL store
-  emit [--dry-run]    Resolve and emit merged agent .md files
-  render <module>     Resolve and print a single agent
-  stats               Show agent counts
+  build               Import .md files into the JSONL store
+  emit [--dry-run]    Resolve and emit merged .md files
+  render <module>     Resolve and print a single module
+  stats               Show module counts
   doctor              Validate references and detect cycles
   config [show|set|unset]  Inspect or modify config
 

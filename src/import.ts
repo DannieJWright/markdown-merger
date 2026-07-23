@@ -33,14 +33,6 @@ export async function build(
   storePath: string,
   project: string,
 ): Promise<void> {
-  // Clear the store so repeated builds are idempotent
-  try {
-    await access(storePath, fsConstants.F_OK);
-    await truncate(storePath, 0);
-  } catch {
-    // File doesn't exist yet — nothing to clear
-  }
-
   const seen = new Set<string>();
 
   for (const rootDir of rootDirs) {
@@ -64,21 +56,31 @@ export async function build(
         : undefined;
       const abstractBool = metadata.abstract === true;
 
+      // Guard against empty strings to prevent confusing warnings during emit
+      const typeValue = typeof metadata.type === "string" && metadata.type.length > 0
+        ? (metadata.type as string).trim()
+        : undefined;
+
       const existing = await findLatest(storePath, modulePath);
 
+      // Build the patch object — for updates, only include type if it has a value
+      // to avoid erasing the existing record's type on re-import
+      const patch: Partial<PromptRecord> = {
+        sections,
+        frontmatter: metadata,
+        extends: extendsArr,
+        abstract: abstractBool,
+      };
+
+      if (typeValue !== undefined) {
+        patch.type = typeValue;
+      }
+
       if (existing) {
-        await updateOrCreate(storePath, modulePath, project, {
-          sections,
-          frontmatter: metadata,
-          extends: extendsArr,
-          abstract: abstractBool,
-        });
+        await updateOrCreate(storePath, modulePath, project, patch);
       } else {
         await updateOrCreate(storePath, modulePath, project, {
-          sections,
-          frontmatter: metadata,
-          extends: extendsArr,
-          abstract: abstractBool,
+          ...patch,
           status: "active",
         });
       }

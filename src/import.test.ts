@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe("build", () => {
-  test("imports a single agent file", async () => {
+  test("imports a single module file", async () => {
     writeFileSync(join(rootDir, "base.md"), "---\nname: base\n---\n## Role\nYou are helpful.");
     await build([rootDir], storePath, "test-project");
     const record = await findLatest(storePath, "base");
@@ -48,16 +48,47 @@ describe("build", () => {
     expect(record!.extends).toEqual(["base"]);
   });
 
-  test("build is idempotent — repeated builds don't append duplicates", async () => {
+  test("build is idempotent — repeated builds update existing records", async () => {
     writeFileSync(join(rootDir, "base.md"), "---\nname: base\n---\n## Role\nYou are helpful.");
 
     await build([rootDir], storePath, "test-project");
-    let records = await readStore(storePath);
-    expect(records).toHaveLength(1);
+    let record = await findLatest(storePath, "base");
+    expect(record).toBeDefined();
+    expect(record!.sections[0]!.body).toBe("You are helpful.");
 
     await build([rootDir], storePath, "test-project");
-    records = await readStore(storePath);
-    expect(records).toHaveLength(1); // should still be 1, not 2
+    record = await findLatest(storePath, "base");
+    expect(record).toBeDefined();
+    expect(record!.sections[0]!.body).toBe("You are helpful.");
+  });
+
+  test("extracts type from frontmatter", async () => {
+    writeFileSync(join(rootDir, "typed.md"), "---\ntype: skill\n---\n## Role\nHelper.");
+    await build([rootDir], storePath, "test-project");
+    const record = await findLatest(storePath, "typed");
+    expect(record).toBeDefined();
+    expect(record!.type).toBe("skill");
+  });
+
+  test("leaves type undefined when not in frontmatter", async () => {
+    writeFileSync(join(rootDir, "notype.md"), "---\nname: NoType\n---\n## Role\nHelper.");
+    await build([rootDir], storePath, "test-project");
+    const record = await findLatest(storePath, "notype");
+    expect(record).toBeDefined();
+    expect(record!.type).toBeUndefined();
+  });
+
+ test("preserves type across rebuild when frontmatter omits type", async () => {
+    writeFileSync(join(rootDir, "persist-integration.md"), "---\ntype: skill\nname: PersistIntegration\n---\n## Role\nInitial.");
+    await build([rootDir], storePath, "test-project");
+    let record = await findLatest(storePath, "persist-integration");
+    expect(record?.type).toBe("skill");
+
+    writeFileSync(join(rootDir, "persist-integration.md"), "---\nname: PersistIntegration\n---\n## Role\nUpdated body.");
+    await build([rootDir], storePath, "test-project");
+    record = await findLatest(storePath, "persist-integration");
+    expect(record?.type).toBe("skill");
+    expect(record?.sections[0]?.body).toBe("Updated body.");
   });
 
   test("first root dir wins when same module name exists in multiple roots", async () => {

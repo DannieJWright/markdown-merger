@@ -15,6 +15,12 @@ describe("extractFrontmatter", () => {
     expect(metadata.abstract).toBe(true);
   });
 
+  test("parses type field as string scalar", () => {
+    const content = "---\ntype: skill\n---\n## Role\nBody";
+    const { metadata } = extractFrontmatter(content);
+    expect(metadata.type).toBe("skill");
+  });
+
   test("parses array values", () => {
     const content = `---\nextends: [system/base, traits/caution]\n---\nbody`;
     const { metadata } = extractFrontmatter(content);
@@ -249,6 +255,15 @@ describe("renderMarkdown", () => {
     expect(secondParse[0]!.children![1]!.body).toBe(firstParse[0]!.children![1]!.body);
     expect(secondParse[1]!.name).toBe(firstParse[1]!.name);
     expect(secondParse[1]!.body).toBe(firstParse[1]!.body);
+  });
+
+  test("strips type from rendered frontmatter", () => {
+    const result = renderMarkdown(
+      { name: "Test", type: "skill" },
+      [{ name: "role", body: "Helper" }]
+    );
+    expect(result).not.toContain("type:");
+    expect(result).toContain("name: Test");
   });
 
   test("round-trip: parse → render → parse preserves deep nesting (3 levels)", () => {

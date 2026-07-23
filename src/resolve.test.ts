@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mergeSections, resolvePrompt, topologicalSort } from "./resolve";
+import { mergeSections, resolve, topologicalSort } from "./resolve";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -149,13 +149,13 @@ describe("mergeSections", () => {
   });
 });
 
-describe("resolvePrompt", () => {
-  test("resolves leaf agent with no extends", async () => {
+describe("resolve", () => {
+  test("resolves leaf module with no extends", async () => {
     await updateOrCreate(storePath, "base", "test", {
       sections: [{ name: "role", body: "helper" }],
       frontmatter: { name: "Base" },
     });
-    const result = await resolvePrompt(storePath, "base", 5);
+    const result = await resolve(storePath, "base", 5);
     expect(result.sections).toHaveLength(1);
     expect(result.resolvedFrom).toEqual(["base"]);
   });
@@ -170,7 +170,7 @@ describe("resolvePrompt", () => {
       extends: ["parent"],
       frontmatter: { name: "Child" },
     });
-    const result = await resolvePrompt(storePath, "child", 5);
+    const result = await resolve(storePath, "child", 5);
     expect(result.sections[0]!.body).toBe("child role");
     expect(result.resolvedFrom).toContain("parent");
     expect(result.resolvedFrom).toContain("child");
@@ -191,7 +191,7 @@ describe("resolvePrompt", () => {
       sections: [{ name: "role", body: "child" }],
       frontmatter: { name: "Child" },
     });
-    const result = await resolvePrompt(storePath, "child", 5);
+    const result = await resolve(storePath, "child", 5);
     expect(result.sections[0]!.body).toBe("child");
     expect(result.sections.find(s => s.name === "constraints")?.body).toBe("gp constraints");
     expect(result.resolvedFrom).toEqual(["grandparent", "parent", "child"]);
@@ -218,7 +218,7 @@ describe("resolvePrompt", () => {
       sections: [{ name: "role", body: "D role" }],
       frontmatter: { name: "D" },
     });
-    const result = await resolvePrompt(storePath, "D", 5);
+    const result = await resolve(storePath, "D", 5);
     // Should not throw cycle error despite shared ancestor A
     expect(result.sections.find(s => s.name === "role")?.body).toBe("D role");
     expect(result.sections.find(s => s.name === "constraints")).toBeDefined();
@@ -242,7 +242,7 @@ describe("resolvePrompt", () => {
       });
     }
     await updateOrCreate(storePath, "leaf", "test", { sections: [], frontmatter: {} });
-    await expect(resolvePrompt(storePath, "chain-9", 3)).rejects.toThrow();
+    await expect(resolve(storePath, "chain-9", 3)).rejects.toThrow();
   });
 });
 

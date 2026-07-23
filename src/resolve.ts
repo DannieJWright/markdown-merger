@@ -76,26 +76,26 @@ function deepCloneSections(sections: Section[]): Section[] {
 }
 
 /**
- * Recursively resolve a prompt by name, merging all inherited sections and frontmatter.
+ * Recursively resolve a module by name, merging all inherited sections and frontmatter.
  *
  * Algorithm:
  *   1. If name in visited → throw CircularInheritanceError
  *   2. If depth >= maxDepth → throw DepthExceededError
  *   3. Add name to visited
- *   4. Find prompt by name in store via findLatest
+ *   4. Find module by name in store via findLatest
  *   5. If not found → throw Error
  *   6. Start with accumulated sections [] and frontmatter {}
  *   7. For each ancestor in extends (left-to-right):
- *      a. Recursively resolvePrompt
+ *      a. Recursively resolve
  *      b. mergeSections(accumulated, ancestorResult.sections)
  *      c. Shallow-merge ancestorResult.frontmatter
  *      d. Track ancestor in resolvedFrom
- *   8. Merge focal prompt's own sections on top of accumulated
- *   9. Shallow-merge focal prompt's frontmatter on top
+ *   8. Merge focal module's own sections on top of accumulated
+ *   9. Shallow-merge focal module's frontmatter on top
  *   10. Remove name from visited (backtracking)
  *   11. Return result with focal name appended to resolvedFrom
  */
-export async function resolvePrompt(
+export async function resolve(
   storePath: string,
   name: string,
   maxDepth: number,
@@ -121,10 +121,10 @@ export async function resolvePrompt(
   // Step 3: add to visited
   _visited.add(name);
 
-  // Step 4: find prompt
+  // Step 4: find module
   const prompt = await findLatest(storePath, name);
   if (!prompt) {
-    throw new Error(`Prompt "${name}" not found`);
+    throw new Error(`Module "${name}" not found`);
   }
 
   // Step 6: start with empty accumulated
@@ -136,7 +136,7 @@ export async function resolvePrompt(
   if (prompt.extends && prompt.extends.length > 0) {
     for (const ancestor of prompt.extends) {
       // Step 7a: recursively resolve ancestor
-      const ancestorResult = await resolvePrompt(
+      const ancestorResult = await resolve(
         storePath,
         ancestor,
         maxDepth,
@@ -155,10 +155,10 @@ export async function resolvePrompt(
     }
   }
 
-  // Step 8: merge focal prompt's own sections on top
+  // Step 8: merge focal module's own sections on top
   accumulatedSections = mergeSections(accumulatedSections, prompt.sections);
 
-  // Step 9: shallow-merge focal prompt's frontmatter as final override
+  // Step 9: shallow-merge focal module's frontmatter as final override
   accumulatedFrontmatter = { ...accumulatedFrontmatter, ...prompt.frontmatter };
 
   // Step 10: backtracking — remove from visited
@@ -175,9 +175,9 @@ export async function resolvePrompt(
 }
 
 /**
- * Topologically sort all prompts in the store using Kahn's algorithm.
+ * Topologically sort all modules in the store using Kahn's algorithm.
  *
- * Returns a list of prompt names where parents always appear before their dependents.
+ * Returns a list of module names where parents always appear before their dependents.
  * Throws an error if a cycle is detected.
  *
  * Algorithm:
