@@ -16,7 +16,7 @@ function renderSection(section: Section): string {
   if (section.children?.length) {
     for (const child of section.children) result += "\n\n" + renderSection(child);
   }
-  return result + "\n\n";
+  return result;
 }
 
 /**
@@ -53,7 +53,10 @@ export async function renderText(
     output += "---\n\n";
   }
 
-  for (const section of result.sections) output += renderSection(section);
+  const sectionTexts = result.sections.map(renderSection);
+  if (sectionTexts.length > 0) {
+    output += sectionTexts.join("\n\n") + "\n";
+  }
   return output;
 }
 
