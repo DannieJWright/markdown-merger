@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { readStore, appendRecord, findLatest, updateOrCreate } from "@evo/store";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PromptRecord } from "@evo/types";
 
-const testDir = join(tmpdir(), "evo-test-store-" + Math.random().toString(36).slice(2));
+const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
+const testDir = join(baseTempDir, "evo-test-store-" + Math.random().toString(36).slice(2));
 
 beforeEach(() => {
   mkdirSync(testDir, { recursive: true });

@@ -1,8 +1,9 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import { getConfigPath, loadConfig } from "@evo/config";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+
+const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 describe("getConfigPath", () => {
   test("uses EVO_CONFIG env var when set", () => {
     const orig = process.env.EVO_CONFIG;
@@ -36,7 +37,7 @@ describe("loadConfig", () => {
   });
 
   test("reads project name from config", async () => {
-    const tmpDir = join(tmpdir(), "evo-project-test-" + Math.random().toString(36).slice(2));
+    const tmpDir = join(baseTempDir, "evo-project-test-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "cfg.yaml");
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(cfgPath, [
@@ -60,7 +61,7 @@ describe("loadConfig", () => {
 
 describe("loadConfig emitDirs", () => {
   test("emitDirs defaults to { default: 'output' }", async () => {
-    const tmpDir = join(tmpdir(), "evo-emitdirs-default-" + Math.random().toString(36).slice(2));
+    const tmpDir = join(baseTempDir, "evo-emitdirs-default-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "cfg.yaml");
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(cfgPath, [
@@ -83,7 +84,7 @@ describe("loadConfig emitDirs", () => {
   });
 
   test("parses indented key-value pairs as nested object", async () => {
-    const tmpDir = join(tmpdir(), "evo-emitdirs-test-" + Math.random().toString(36).slice(2));
+    const tmpDir = join(baseTempDir, "evo-emitdirs-test-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "cfg.yaml");
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(cfgPath, [
@@ -112,7 +113,7 @@ describe("loadConfig emitDirs", () => {
   });
 
  test("resolves multiple emitDirs keys to absolute paths", async () => {
-    const tmpDirBase = join(tmpdir(), "evo-multi-emit-" + Math.random().toString(36).slice(2));
+    const tmpDirBase = join(baseTempDir, "evo-multi-emit-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDirBase, "cfg.yaml");
     mkdirSync(tmpDirBase, { recursive: true });
     mkdirSync(join(tmpDirBase, "input"), { recursive: true });
@@ -144,7 +145,7 @@ describe("loadConfig emitDirs", () => {
   });
 
   test("warns when old emitDir format is detected", async () => {
-    const tmpDir = join(tmpdir(), "evo-migrate-test-" + Math.random().toString(36).slice(2));
+    const tmpDir = join(baseTempDir, "evo-migrate-test-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "cfg.yaml");
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(cfgPath, [
@@ -186,7 +187,7 @@ describe("loadConfig CWD path resolution", () => {
   });
 
   test("passes absolute paths through unchanged", async () => {
-    const tmpDir = join(tmpdir(), "evo-abs-test-" + Math.random().toString(36).slice(2));
+    const tmpDir = join(baseTempDir, "evo-abs-test-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "abs.yaml");
     const storeAbs = join(tmpDir, "abs-store.jsonl");
     mkdirSync(tmpDir, { recursive: true });

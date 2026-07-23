@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "@evo/import";
 import { readStore, findLatest } from "@evo/store";
 
-const testDir = join(tmpdir(), "evo-test-import-" + Math.random().toString(36).slice(2));
+const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
+const testDir = join(baseTempDir, "evo-test-import-" + Math.random().toString(36).slice(2));
 const rootDir = join(testDir, "agents");
 const storePath = join(testDir, "store.jsonl");
 
