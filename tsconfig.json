@@ -9,7 +9,11 @@
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
     "types": ["node", "bun"],
-    "rootDir": "src"
+    "rootDir": ".",
+    "paths": {
+      "@evo/*": ["./src/*"]
+    }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests/build"]
 }
