@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { readStore, appendRecord, findLatest, updateOrCreate } from "./store";
+import { readStore, appendRecord, findLatest, updateOrCreate } from "@evo/store";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PromptRecord } from "./types";
+import type { PromptRecord } from "@evo/types";
 
 const testDir = join(tmpdir(), "evo-test-store-" + Math.random().toString(36).slice(2));
 

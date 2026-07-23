@@ -2,9 +2,9 @@ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { emitAll, renderText } from "./emit";
-import { updateOrCreate, findLatest } from "./store";
-import type { Config } from "./types";
+import { emitAll, renderText } from "@evo/emit";
+import { updateOrCreate, findLatest } from "@evo/store";
+import type { Config } from "@evo/types";
 
 const testDir = join(tmpdir(), "evo-test-emit-" + Math.random().toString(36).slice(2));
 const storePath = join(testDir, "store.jsonl");

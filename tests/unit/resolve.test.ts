@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mergeSections, resolve, topologicalSort } from "./resolve";
+import { mergeSections, resolve, topologicalSort } from "@evo/resolve";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Section } from "./types";
-import { updateOrCreate } from "./store";
+import type { Section } from "@evo/types";
+import { updateOrCreate } from "@evo/store";
 
 const testDir = join(tmpdir(), "evo-test-resolve-" + Math.random().toString(36).slice(2));
 let storePath: string;

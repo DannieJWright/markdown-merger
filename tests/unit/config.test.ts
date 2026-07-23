@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { getConfigPath, loadConfig } from "./config";
+import { getConfigPath, loadConfig } from "@evo/config";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
