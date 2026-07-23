@@ -65,18 +65,30 @@ describe("renderText", () => {
     expect(output).toContain("## Role");
   });
 
-  test("has blank line between consecutive sections", async () => {
-    await updateOrCreate(storePath, "multi-section", "test", {
+  test("has exactly one blank line between child body and sibling section", async () => {
+    // The compounding bug manifests at:
+    // 1) Last child → next sibling child (within same parent)
+    // 2) Last child → next top-level section (after parent returns)
+    // Childless sections and parent→first-child are NOT affected.
+    await updateOrCreate(storePath, "compounding-bug", "test", {
       sections: [
-        { name: "role", body: "You are a coding assistant." },
-        { name: "constraints", body: "Think carefully." },
+        { name: "role", body: "You are a coding assistant.", level: 1, children: [
+          { name: "identity", body: "I am an AI.", level: 2 },
+          { name: "behavior", body: "Be helpful.", level: 2 },
+        ]},
+        { name: "constraints", body: "Think carefully.", level: 1 },
       ],
       frontmatter: {},
     });
-    const output = await renderText(storePath, "multi-section", 5);
-    // There should be a blank line between the end of one section's body
-    // and the start of the next section header.
-    expect(output).toContain("You are a coding assistant.\n\n## Constraints");
+    const output = await renderText(storePath, "compounding-bug", 5);
+    // Between child1 and child2: exactly \n\n — not \n\n\n or more
+    expect(output).toMatch(/I am an AI\.\n\n### Behavior/);
+    expect(output).not.toMatch(/AI\.\n\n\n/);
+    // Between last child of parent and next sibling section: exactly \n\n
+    expect(output).toMatch(/helpful\.\n\n## Constraints/);
+    expect(output).not.toMatch(/helpful\.\n\n\n/);
+    // Output must not end with trailing blank lines
+    expect(output).not.toMatch(/\n\n+$/);
   });
 
   test("renders nested sections with correct heading levels", async () => {
