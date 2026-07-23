@@ -1,0 +1,9 @@
+project: evo-ai
+version: "1"
+maxInheritDepth: 5
+storeFile: tests/build/prompts.jsonl
+emitDirs:
+  agent: tests/build/agents-root/output/agents
+  skill: tests/build/agents-root/output/skills
+rootDirs:
+  - tests/resources/agents-root/input

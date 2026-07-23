@@ -60,7 +60,7 @@ export async function renderText(
 /**
  * Deduplicate store records to keep only the latest version per name.
  */
-function deduplicateRecords(records: PromptRecord[]): PromptRecord[] {
+export function deduplicateRecords(records: PromptRecord[]): PromptRecord[] {
   const latestByNames = new Map<string, PromptRecord>();
   for (const record of records) {
     const existing = latestByNames.get(record.name);
