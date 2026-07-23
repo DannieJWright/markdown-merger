@@ -1,8 +1,0 @@
-project: evo-ai
-version: "1"
-maxInheritDepth: 5
-storeFile: .evo/agents-root/prompts.jsonl
-emitDirs:
-  default: .evo/agents-root/output
-rootDirs:
-  - .evo/agents-root/input
