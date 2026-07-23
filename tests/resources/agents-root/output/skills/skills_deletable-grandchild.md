@@ -14,8 +14,6 @@ Base second grandchild deletable.
 
 Base second child deletable.
 
-
-
 #### Second Grandchild Deletable
 
 Base second grandchild deletable

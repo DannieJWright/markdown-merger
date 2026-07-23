@@ -6,8 +6,6 @@ This should delete the OG child and it's decendants, while leaving the second ch
 
 Base second child deletable.
 
-
-
 #### Second Grandchild Deletable
 
 Base second grandchild deletable

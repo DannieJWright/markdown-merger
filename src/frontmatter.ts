@@ -166,7 +166,7 @@ function parseChildren(
       bodyEnd = Math.min(firstBodyLine + 1, end);
     }
 
-    section.body = lines.slice(line + 1, bodyEnd).join("\n").trim();
+    section.body = lines.slice(line + 1, bodyEnd).join("\n").replace(/\n+$/, "").trim();
 
     if (childIdx > 0) {
       const { sections: children, nextLine: nl } = parseChildren(lines, fenceState, childIdx, end, level);
@@ -188,7 +188,10 @@ function parseChildren(
         line++;
       }
       if (trailing.length > 0) {
-        section.body += "\n\n" + trailing.join("\n").trim();
+        const trailingText = trailing.join("\n").replace(/^\n+/u, "").replace(/\n+$/u, "").trim();
+        if (trailingText) {
+          section.body += "\n\n" + trailingText;
+        }
       }
     } else {
       // No children — advance past the section's body
