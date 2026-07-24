@@ -1,9 +1,9 @@
 {
-  "name": "evo-ai",
+  "name": "md-merger",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "evo": "./src/index.ts"
+    "md-merger": "./src/index.ts"
   },
   "scripts": {
     "dev": "bun run --watch src/index.ts",

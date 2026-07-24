@@ -1,4 +1,4 @@
-project: evo-ai
+project: md-merger
 version: "1"
 maxInheritDepth: 5
 storeFile: tests/build/prompts.jsonl

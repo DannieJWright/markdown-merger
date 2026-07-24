@@ -40,5 +40,5 @@ export const DEFAULT_CONFIG: Omit<Config, "project" | "version"> = {
   maxInheritDepth: DEFAULT_MAX_INHERIT_DEPTH,
   storeFile: "prompts.jsonl",
   emitDirs: { default: "output" },
-  rootDirs: [".evo/agents-root/input"],
+  rootDirs: [".md-merger/agents-root/input"],
 };

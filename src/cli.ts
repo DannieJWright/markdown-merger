@@ -44,7 +44,7 @@ export async function run(argv: string[]): Promise<void> {
     case "render": {
       const name = args[0];
       if (!name) {
-        throw new Error("Usage: evo render <module>");
+        throw new Error("Usage: md-merger render <module>");
       }
       console.log(await renderText(storePath, name, config.maxInheritDepth));
       break;
@@ -89,18 +89,18 @@ export async function run(argv: string[]): Promise<void> {
         console.log(`Config path: ${getConfigPath()}`);
         console.log(JSON.stringify(config, null, 2));
       } else if (subCmd === "set" && args[1] && args[2]) {
-        console.error("Config set: not yet implemented (use env var EVO_CONFIG for path)");
+        console.error("Config set: not yet implemented (use env var MD_MERGER_CONFIG for path)");
         break;
       } else if (subCmd === "unset") {
         console.error("Config unset: not yet implemented");
         break;
       } else {
-        throw new Error("Usage: evo config [show|set|unset]");
+        throw new Error("Usage: md-merger config [show|set|unset]");
       }
       break;
     }
     default: {
-      console.log(`Usage: evo <command>
+      console.log(`Usage: md-merger <command>
 
 Commands:
   build               Import .md files into the JSONL store
@@ -111,7 +111,7 @@ Commands:
   config [show|set|unset]  Inspect or modify config
 
 Environment:
-  EVO_CONFIG          Path to config file (default: .evo/config.yaml)
+  MD_MERGER_CONFIG    Path to config file (default: .md-merger/config.yaml)
 `);
       if (cmd !== "help" && cmd !== "-h" && cmd !== "--help") {
         console.error(`Unknown command: ${cmd}`);

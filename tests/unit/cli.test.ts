@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { parseCliArgs, run } from "@evo/cli";
+import { parseCliArgs, run } from "@md-merger/cli";
 import { resolve } from "node:path";
 
 const PROJECT_ROOT = resolve(import.meta.dirname, "..", "..");
@@ -37,13 +37,13 @@ describe("parseCliArgs", () => {
 });
 
 describe("run error paths", () => {
-  const origEnv = process.env.EVO_CONFIG;
+  const origEnv = process.env.MD_MERGER_CONFIG;
   beforeEach(() => {
-    process.env.EVO_CONFIG = resolve(PROJECT_ROOT, "tests", "resources", "agents-root", "config.yaml");
+    process.env.MD_MERGER_CONFIG = resolve(PROJECT_ROOT, "tests", "resources", "agents-root", "config.yaml");
   });
   afterEach(() => {
-    if (origEnv === undefined) delete process.env.EVO_CONFIG;
-    else process.env.EVO_CONFIG = origEnv;
+    if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;
+    else process.env.MD_MERGER_CONFIG = origEnv;
   });
 
   test("throws on unknown command", async () => {
@@ -51,7 +51,7 @@ describe("run error paths", () => {
   });
 
   test("throws on render without module name", async () => {
-    await expect(run(["render"])).rejects.toThrow("Usage: evo render <module>");
+    await expect(run(["render"])).rejects.toThrow("Usage: md-merger render <module>");
   });
 
   test("help command does not throw", async () => {
