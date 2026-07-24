@@ -22,6 +22,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+      - name: Extract version without v prefix
+        id: version
+        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
       - name: Wait for md-merger to be published
         run: |
           for i in $(seq 1 10); do
@@ -35,7 +38,7 @@ jobs:
           echo "ERROR: md-merger failed to publish within 5 minutes"
           exit 1
         env:
-          MD_MERGER_VERSION: ${{ github.ref_name }}
+          MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
       - name: Replace link: with semver for npm publish
         working-directory: opencode-plugin
         run: |

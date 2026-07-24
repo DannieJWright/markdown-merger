@@ -31,12 +31,8 @@ async function loadBundledDefaults(): Promise<Map<string, string>> {
 export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
   try {
     const bundledDefaults = await loadBundledDefaults();
-    // NOTE: If OpenCode provides input.directory, chdir to it before calling
-    // loadConfig()/emitAll() so config resolution uses the correct working context:
-    // if (input.directory) process.chdir(input.directory);
+    if (_input.directory) process.chdir(_input.directory);
     const config = await loadConfig();
-    // TODO: dryRun is hard-coded to false (plugin should always emit).
-    // Could be made configurable via plugin settings or input config later.
     const writtenPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
 
     if (writtenPaths.length === 0 && bundledDefaults.size > 0) {
@@ -45,7 +41,22 @@ export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
 
     const agentHooks = {
       config: async (opencodeConfig: Record<string, unknown>) => {
-        if (writtenPaths.length === 0) {
+        if (writtenPaths.length > 0) {
+          // Read emitted agent files and inject into OpenCode config
+          if (opencodeConfig.agent === undefined) {
+            opencodeConfig.agent = {};
+          }
+          const agentConfig = opencodeConfig.agent as Record<string, unknown>;
+          for (const path of writtenPaths) {
+            try {
+              const content = await readFile(path, "utf-8");
+              const agentName = path.replace(/\.md$/, "");
+              agentConfig[agentName] = { prompt: content };
+            } catch {
+              console.warn(`[md-merger] Failed to read emitted agent: ${path}`);
+            }
+          }
+        } else {
           console.log("[md-merger] No emitted agents found, using bundled defaults");
           // Inject bundled defaults directly into OpenCode config
           if (opencodeConfig.agent === undefined) {

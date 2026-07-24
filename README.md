@@ -70,7 +70,7 @@ npm install -g md-merger
 Add to your `opencode.json`:
 
 ```json
-{ "plugins": ["@md-merger/opencode-plugin"] }
+{ "plugin": ["@md-merger/opencode-plugin"] }
 ```
 
 #### Local Development

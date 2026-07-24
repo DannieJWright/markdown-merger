@@ -5,7 +5,7 @@
   "main": "./src/index.ts",
   "files": ["src/", "defaults/"],
   "dependencies": {
-    "md-merger": "link:md-merger",
+    "md-merger": "workspace:*",
     "@opencode-ai/plugin": "^1.0.0"
   },
   "scripts": {
