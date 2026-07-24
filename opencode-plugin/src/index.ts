@@ -1,5 +1,5 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { loadConfig, emitAll, DEFAULT_CONFIG } from "md-merger";
+import { loadConfig, emitAll } from "md-merger";
 import type { Config } from "md-merger";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
@@ -24,7 +24,7 @@ async function loadBundledDefaults(): Promise<Map<string, string>> {
   return defaults;
 }
 
-export const mdMergerPlugin: Plugin = async (input: PluginInput) => {
+export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
   try {
     const bundledDefaults = await loadBundledDefaults();
     // NOTE: If OpenCode provides input.directory, chdir to it before calling
