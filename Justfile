@@ -1,7 +1,7 @@
-# Justfile for evo-ai — markdown file processing with inheritance
+# Justfile for md-merger — markdown file processing with inheritance
 #
 # Setup:
-#   1. Create .evo/config.yaml with your project config
+#   1. Create .md-merger/config.yaml with your project config
 #   2. Create .md files with type and extends in frontmatter
 #   3. Run: just build          # import modules into store
 #   4. Run: just emit           # generate merged output files
