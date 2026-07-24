@@ -1,0 +1,32 @@
+name: Publish opencode-plugin to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Replace link:md-merger with semver for npm publish
+        working-directory: opencode-plugin
+        run: |
+          node -e "const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+          p.dependencies['md-merger'] = '^1.0.0';
+          require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
+      - run: npm publish --provenance --access public
+        working-directory: opencode-plugin
