@@ -1,12 +1,34 @@
 {
   "name": "md-merger",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "CLI tool for managing AI agent/skill prompts as Markdown files with hierarchical inheritance",
   "type": "module",
   "bin": {
-    "md-merger": "./src/index.ts"
+    "md-merger": "./dist/index.js"
   },
+  "exports": {
+    ".": {
+      "import": "./src/api.ts",
+      "types": "./src/api.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "defaults/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "workspaces": [
+    "opencode-plugin"
+  ],
+  "license": "MIT",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
+    "bundle": "bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'",
     "build": "bun src/index.ts build",
     "emit": "bun src/index.ts emit",
     "render": "bun src/index.ts render",
