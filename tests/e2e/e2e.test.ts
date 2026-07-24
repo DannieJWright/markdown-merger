@@ -30,7 +30,7 @@ const configPath = resolve(SCENARIO_ROOT, "config.yaml");
 const expectedOutputDir = resolve(SCENARIO_ROOT, "output");
 
 describe("E2E: agents-root", () => {
-  const origEnv = process.env.EVO_CONFIG;
+  const origEnv = process.env.MD_MERGER_CONFIG;
   const origCwd = process.cwd();
 
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe("E2E: agents-root", () => {
     }
     mkdirSync(BUILD_DIR, { recursive: true });
     // Set config to point to the test scenario
-    process.env.EVO_CONFIG = configPath;
+    process.env.MD_MERGER_CONFIG = configPath;
     try {
       process.chdir(PROJECT_ROOT);
     } catch (e) {
@@ -49,8 +49,8 @@ describe("E2E: agents-root", () => {
   });
 
   afterEach(() => {
-    if (origEnv === undefined) delete process.env.EVO_CONFIG;
-    else process.env.EVO_CONFIG = origEnv;
+    if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;
+    else process.env.MD_MERGER_CONFIG = origEnv;
     process.chdir(origCwd);
   });
 

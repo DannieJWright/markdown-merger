@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, rmSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { emitAll, renderText } from "@evo/emit";
-import { updateOrCreate, findLatest } from "@evo/store";
-import type { Config } from "@evo/types";
+import { emitAll, renderText } from "@md-merger/emit";
+import { updateOrCreate, findLatest } from "@md-merger/store";
+import type { Config } from "@md-merger/types";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 const testDir = join(baseTempDir, "evo-test-emit-" + Math.random().toString(36).slice(2));

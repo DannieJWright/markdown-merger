@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { extractFrontmatter, parseSections, renderMarkdown } from "@evo/frontmatter";
-import type { Section } from "@evo/types";
+import { extractFrontmatter, parseSections, renderMarkdown } from "@md-merger/frontmatter";
+import type { Section } from "@md-merger/types";
 
 describe("extractFrontmatter", () => {
   test("returns empty metadata when no frontmatter", () => {

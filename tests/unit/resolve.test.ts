@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mergeSections, resolve, topologicalSort } from "@evo/resolve";
+import { mergeSections, resolve, topologicalSort } from "@md-merger/resolve";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Section } from "@evo/types";
-import { updateOrCreate } from "@evo/store";
+import type { Section } from "@md-merger/types";
+import { updateOrCreate } from "@md-merger/store";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 const testDir = join(baseTempDir, "evo-test-resolve-" + Math.random().toString(36).slice(2));
