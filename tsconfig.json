@@ -8,10 +8,11 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
-    "types": ["node", "bun"],
+    "types": ["node", "bun-types"],
     "rootDir": ".",
     "paths": {
-      "@md-merger/*": ["./src/*"]
+      "@md-merger/*": ["./src/*"],
+      "md-merger": ["./src/api.ts"]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "opencode-plugin/**/*.ts"],
