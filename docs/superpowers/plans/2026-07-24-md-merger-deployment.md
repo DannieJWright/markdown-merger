@@ -19,6 +19,7 @@
 - `workspace:*` protocol for monorepo resolution (Bun supports it)
 - Config reads from `$MD_MERGER_CONFIG` env var or `.md-merger/config.yaml`
 - Spec: `docs/superpowers/specs/2026-07-24-md-merger-deployment-design.md`
+- `exports` keys pointing to `.ts` files (in `package.json`) is intentional and relies on Bun's native TypeScript support. npm consumers must use Bun or a TS-capable runtime.
 
 ---
 
@@ -64,7 +65,8 @@ Apply these changes to `package.json`:
   "license": "MIT",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'",
+    "bundle": "bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'",
+    "build": "bun src/index.ts build",
     "emit": "bun src/index.ts emit",
     "render": "bun src/index.ts render",
     "stats": "bun src/index.ts stats",
@@ -136,11 +138,9 @@ git commit -m "chore: include opencode-plugin in tsconfig"
 
 ```typescript
 // src/api.ts — public library API
-// Re-exports the core md-merger symbols for plugin and library consumers
-
 export { loadConfig, getConfigPath } from "./config";
-export { emitAll, renderText, deduplicateRecords } from "./emit";
-export type { Config, PromptRecord, Section, RenderResult } from "./types";
+export { emitAll } from "./emit";
+export type { Config } from "./types";
 export { DEFAULT_CONFIG, DEFAULT_MAX_INHERIT_DEPTH } from "./types";
 ```
 
@@ -163,14 +163,6 @@ describe("api.ts exports", () => {
 
   it("exports emitAll as a function", () => {
     expect(typeof api.emitAll).toBe("function");
-  });
-
-  it("exports renderText as a function", () => {
-    expect(typeof api.renderText).toBe("function");
-  });
-
-  it("exports deduplicateRecords as a function", () => {
-    expect(typeof api.deduplicateRecords).toBe("function");
   });
 
   it("exports DEFAULT_CONFIG with expected keys", () => {
@@ -388,12 +380,13 @@ git commit -m "feat: add five core bundled agent templates"
   "version": "1.0.0",
   "type": "module",
   "main": "./src/index.ts",
-  "files": ["src/"],
+  "files": ["src/", "defaults/"],
   "dependencies": {
+    "md-merger": "workspace:*",
     "@opencode-ai/plugin": "^1.0.0"
   },
-  "peerDependencies": {
-    "md-merger": "^1.0.0"
+"scripts": {
+    "prepublishOnly": "node -e \"const p=require('./package.json'); p.dependencies['md-merger']='^' + p.version; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\\n'); const {cpSync, existsSync} = require('fs'); if (existsSync('../../defaults')) cpSync('../../defaults', './defaults', {recursive:true}); else console.warn('defaults/ not found — skip copy')\""
   },
   "publishConfig": {
     "access": "public",
@@ -402,7 +395,7 @@ git commit -m "feat: add five core bundled agent templates"
 }
 ```
 
-Note: Uses `peerDependencies` for `md-merger` since OpenCode will already have it available, and avoids workspace protocol in published package.
+Note: Uses `workspace:*` in `dependencies` (Bun's workspace protocol only works in `dependencies`, not `peerDependencies`). The `prepublishOnly` script replaces `workspace:*` with `^1.0.0` before publishing to npm, so consumers get a normal semver range. It also copies `../../defaults/` into `opencode-plugin/defaults/` so the plugin ships its own copy of bundled agent templates (the root's `defaults/` is included in the main `md-merger` package's `files` array and won't survive in a separate `npm install @md-merger/opencode-plugin`).
 
 - [ ] **Step 2: Create plugin src directory**
 
@@ -423,42 +416,77 @@ git commit -m "chore: create plugin package structure"
 - Create: `opencode-plugin/src/index.ts`
 
 **Interfaces:**
-- Consumes: `Plugin`, `PluginInput` types from `@opencode-ai/plugin`, `loadConfig`, `emitAll` from `md-merger`
-- Produces: Named export `mdMergerPlugin` conforming to `Plugin` type
+- Consumes: `Plugin`, `PluginInput` types from `@opencode-ai/plugin`, `loadConfig`, `emitAll`, `DEFAULT_CONFIG` from `md-merger`; bundled defaults from `defaults/agents/` directory (shipped with package)
+- Produces: Named export `mdMergerPlugin` conforming to `Plugin` type; reads bundled .md defaults at runtime and merges with user config before emit
 
 - [ ] **Step 1: Write the plugin entry**
 
 ```typescript
-import type { Plugin, PluginInput, Hooks } from "@opencode-ai/plugin";
-import { loadConfig, emitAll } from "md-merger";
+import type { Plugin, PluginInput } from "@opencode-ai/plugin";
+import { loadConfig, emitAll, DEFAULT_CONFIG } from "md-merger";
 import type { Config } from "md-merger";
+import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Defaults are bundled in the plugin package via prepublishOnly (copies ../../defaults/ to ./defaults/)
+const defaultsDir = join(__dirname, "..", "..", "defaults", "agents");
+
+async function loadBundledDefaults(): Promise<Map<string, string>> {
+  const defaults = new Map<string, string>();
+  if (!existsSync(defaultsDir)) return defaults;
+  // Read each .md file in defaults/agents/
+  const entries = await readdir(defaultsDir);
+  for (const entry of entries) {
+    if (!entry.endsWith(".md")) continue;
+    const agentName = entry.slice(0, -3); // strip .md
+    const content = await Bun.file(join(defaultsDir, entry)).text();
+    defaults.set(agentName, content);
+  }
+  return defaults;
+}
 
 export const mdMergerPlugin: Plugin = async (input: PluginInput) => {
   try {
-    // Load config — falls back to DEFAULT_CONFIG if no config file present
+    const bundledDefaults = await loadBundledDefaults();
+    // NOTE: If OpenCode provides input.directory, chdir to it before calling
+    // loadConfig()/emitAll() so config resolution uses the correct working context:
+    // if (input.directory) process.chdir(input.directory);
     const config = await loadConfig();
+    // TODO: dryRun is hard-coded to false (plugin should always emit).
+    // Could be made configurable via plugin settings or input config later.
+    const writtenPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
 
-    // Run emit pass to resolve all modules
-    const writtenPaths = await emitAll(
-      config.storeFile,
-      config.emitDirs,
-      config,
-      false  // not a dry run — actually emit
-    );
+    if (writtenPaths.length === 0 && bundledDefaults.size > 0) {
+      console.log("[md-merger] No config found — bundled defaults available from defaults/agents/");
+    }
 
-    return {
-      config: async (opencodeConfig: any) => {
-        // Plugin hooks into OpenCode config to inject agents
-        // This will be populated with agent definitions from emit results
-        if (opencodeConfig.agent === undefined) {
-          opencodeConfig.agent = {};
+    const agentHooks = {
+      config: async (opencodeConfig: Record<string, unknown>) => {
+        if (writtenPaths.length === 0) {
+          console.log("[md-merger] No emitted agents found, using bundled defaults");
+          // Inject bundled defaults directly into OpenCode config
+          if (opencodeConfig.agent === undefined) {
+            opencodeConfig.agent = {};
+          }
+          const agentConfig = opencodeConfig.agent as Record<string, unknown>;
+          for (const [name, content] of bundledDefaults) {
+            agentConfig[name] = { prompt: content };
+          }
+        } else {
+          if (opencodeConfig.agent === undefined) {
+            opencodeConfig.agent = {};
+          }
         }
       },
-    } as Hooks;
+    };
+
+    return agentHooks;
   } catch (err) {
-    // Never crash OpenCode — return empty hooks on failure
     console.error("[md-merger] Plugin initialization failed:", err);
-    return {} as Hooks;
+    return {};
   }
 };
 ```
@@ -477,50 +505,31 @@ git commit -m "feat: add plugin entry with config hook"
 
 ---
 
-### Task 7: Create .npmignore and .gitignore updates
+### Task 7: Update .gitignore and verify existing tests
 
 **Files:**
-- Create: `.npmignore`
 - Modify: `.gitignore`
 
 **Interfaces:**
 - Consumes: existing .gitignore
-- Produces: Proper file exclusion for npm tarball
+- Produces: Proper git exclusion for build artifacts
 
-- [ ] **Step 1: Create .npmignore**
+- [ ] **Step 1: Update .gitignore**
 
-```
-src/
-tests/
-docs/
-.github/
-opencode-plugin/
-*.ts
-*.test.*
-bunfig.toml
-Justfile
-*.md
-!README.md
-dist/
-**/dist/
-```
-
-Wait — the spec says `"files": ["dist/", "defaults/", "README.md"]` which takes precedence over `.npmignore`. Since `files` is present, `.npmignore` is unnecessary. **Skip this step** and rely on the `files` field in package.json.
-
-- [ ] **Step 2: Update .gitignore**
-
-Add `dist/` and `opencode-plugin/src/` to `.gitignore` if not already there:
+Add `dist/` to `.gitignore` if not already there (no-op if already present):
 
 ```
 dist/
 ```
 
-- [ ] **Step 3: Verify existing tests still pass**
+Note: `.npmignore` is not needed — the `files` field in `package.json` already controls npm tarball contents (`"files": ["dist/", "defaults/", "README.md"]`).
+
+- [ ] **Step 2: Verify existing tests still pass**
 
 Run: `bun test`
 Expected: All existing tests pass — no behavior changed
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add .gitignore
@@ -537,9 +546,9 @@ git commit -m "chore: update gitignore for build artifacts"
 
 **Interfaces:**
 - Consumes: existing repo structure
-- Produces: Two OIDC-based publishing workflows
+- Produces: Two separate OIDC-based publishing workflows (one per package), both triggered by `v*` tags
 
-- [ ] **Step 1: Create md-merger publish workflow**
+- [ ] **Step 1: Create root md-merger publish workflow**
 
 ```yaml
 name: Publish md-merger to npm
@@ -555,25 +564,25 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  publish-md-merger:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: bun run build
+      - run: bun install
+      - run: bun run bundle
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
       - run: npm publish --provenance --access public
 ```
 
-- [ ] **Step 2: Create opencode-plugin publish workflow**
+- [ ] **Step 2: Create plugin publish workflow**
 
 ```yaml
-name: Publish @md-merger/opencode-plugin to npm
+name: Publish opencode-plugin to npm
 
 on:
   push:
@@ -586,7 +595,7 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  publish-plugin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -597,19 +606,29 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-      - run: cd opencode-plugin && npm publish --provenance --access public
+      - name: Replace workspace:* with semver for npm publish
+        working-directory: opencode-plugin
+        run: |
+          node -e "const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+          p.dependencies['md-merger'] = '^1.0.0';
+          require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
+      - run: npm publish --provenance --access public
+        working-directory: opencode-plugin
 ```
+
+Note on OIDC: Neither workflow sets `NODE_AUTH_TOKEN`. The `id-token: write` permission combined with the absence of `NODE_AUTH_TOKEN` triggers GitHub Actions OIDC authentication automatically. Setting even an empty string for `NODE_AUTH_TOKEN` can prevent the OIDC handshake.
+
+Note on workspace:*: The plugin workflow replaces `workspace:*` with `^1.0.0` in `opencode-plugin/package.json` via a dedicated step before `npm publish`. This is more reliable than depending on a `prepublishOnly` script.
 
 - [ ] **Step 3: Verify YAML syntax**
 
-Run: `python -c "import yaml; yaml.safe_load(open('.github/workflows/md-merger-publish.yml'))"` (if python available) or just trust the syntax is standard GitHub Actions YAML.
+Run: `python -c "import yaml; yaml.safe_load(open('.github/workflows/md-merger-publish.yml'))"` and same for `opencode-plugin-publish.yml` (if python available).
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/
-git commit -m "chore: add npm publish CI workflows"
+git commit -m "chore: add npm publish CI workflows (OIDC, two separate files)"
 ```
 
 ---
@@ -623,7 +642,9 @@ git commit -m "chore: add npm publish CI workflows"
 - Consumes: none
 - Produces: MIT license file (required by spec's package.json `license` field)
 
-- [ ] **Step 1: Create LICENSE**
+- [ ] **Step 1: Verify LICENSE**
+
+Verify `LICENSE` already exists with MIT text. If present, skip this step. If creating a new file, ensure it includes any existing attribution notices (e.g., Canopy attribution if applicable).
 
 ```
 MIT License
@@ -672,6 +693,13 @@ git commit -m "docs: add MIT license"
 ```typescript
 import { describe, expect, it, mock } from "bun:test";
 
+// Mock md-merger module to avoid hitting the real filesystem
+mock.module("md-merger", () => ({
+  loadConfig: mock(async () => ({ maxInheritDepth: 5, storeFile: "prompts.jsonl", emitDirs: {}, rootDirs: [] })),
+  emitAll: mock(async () => []),
+  DEFAULT_CONFIG: { maxInheritDepth: 5, storeFile: "prompts.jsonl", emitDirs: {}, rootDirs: [] },
+}));
+
 describe("plugin initialization", () => {
   it("plugin exports mdMergerPlugin as an async function", async () => {
     const plugin = await import("../../opencode-plugin/src/index");
@@ -717,8 +745,9 @@ Expected: Builds to `dist/index.js`
 
 - [ ] **Step 2: Verify bundled output**
 
-Run: `node ./dist/index.js --help`
+Run: `bun ./dist/index.js --help`
 Expected: Shows help output without errors
+Note: Source uses Bun.file() — output still needs Bun globals even with --target node
 
 - [ ] **Step 3: Run all tests**
 
@@ -821,7 +850,7 @@ git commit -m "docs: add installation and plugin usage to README"
 | 5 | Create plugin package | `opencode-plugin/package.json` |
 | 6 | Create plugin entry point | `opencode-plugin/src/index.ts` |
 | 7 | Gitignore + verify existing tests | `.gitignore` |
-| 8 | Create CI workflows | `.github/workflows/*.yml` |
+| 8 | Create CI workflows (two separate files) | `.github/workflows/md-merger-publish.yml`, `.github/workflows/opencode-plugin-publish.yml` |
 | 9 | Create LICENSE | `LICENSE` |
 | 10 | Plugin integration tests | `tests/unit/plugin.test.ts` |
 | 11 | Full build + test verification | — |
