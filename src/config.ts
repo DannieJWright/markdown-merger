@@ -3,9 +3,9 @@ import { DEFAULT_CONFIG } from "./types";
 import type { Config } from "./types";
 
 export function getConfigPath(): string {
-  const env = process.env.EVO_CONFIG;
+  const env = process.env.MD_MERGER_CONFIG;
   if (env) return env;
-  return ".evo/config.yaml";
+  return ".md-merger/config.yaml";
 }
 
 function parseYamlScalar(value: string): unknown {
