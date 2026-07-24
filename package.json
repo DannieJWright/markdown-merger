@@ -28,7 +28,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "bundle": "bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'",
+    "bundle": "bun build ./src/index.ts --outdir ./dist --target node",
     "build": "bun src/index.ts build",
     "emit": "bun src/index.ts emit",
     "render": "bun src/index.ts render",
