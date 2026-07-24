@@ -36,7 +36,7 @@
     "doctor": "bun src/index.ts doctor",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run bundle"
+    "prepublishOnly": "node -e \"require('child_process').execSync('bun run bundle', {stdio: 'inherit'})\""
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

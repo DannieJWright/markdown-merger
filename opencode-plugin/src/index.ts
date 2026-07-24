@@ -50,7 +50,7 @@ export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
           for (const path of writtenPaths) {
             try {
               const content = await readFile(path, "utf-8");
-              const agentName = path.replace(/\.md$/, "");
+              const agentName = path.replace(/\.md$/, "").replace(/.*[/\\]/, "");
               agentConfig[agentName] = { prompt: content };
             } catch {
               console.warn(`[md-merger] Failed to read emitted agent: ${path}`);
