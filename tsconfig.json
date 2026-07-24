@@ -14,6 +14,6 @@
       "@md-merger/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "opencode-plugin/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests/build"]
 }
