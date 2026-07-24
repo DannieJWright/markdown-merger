@@ -80,7 +80,10 @@ Full emit pass (same logic as plugin)
 
 - **Name:** `@md-merger/opencode-plugin`
 - **Type:** Module
-- **Main:** `./src/index.ts` (imported directly by OpenCode's Bun runtime)
+- **Package root:** `opencode-plugin/` directory within repo
+- **Entry point:** `opencode-plugin/src/index.ts`
+- **package.json main:** `"./src/index.ts"` (relative to plugin package root)
+- **Imported by:** OpenCode's Bun runtime via `import('@md-merger/opencode-plugin')`
 - **Dependencies:** `md-merger` (workspace), `@opencode-ai/plugin` (types only)
 
 ### Config Resolution Order
@@ -150,6 +153,46 @@ Two workflows, both using npm Trusted Publishing (OIDC):
 - Plugin hooks: config hook injects correct agent definitions
 - CLI: bundle output runs under Node.js without Bun
 - CI: full publish dry-run validates package integrity
+
+## Implementation Context for Fresh Sessions
+
+### Current Project State
+- **Repo:** `md-merger` (formerly evo-ai), monorepo with `src/` (CLI) + `opencode-plugin/` (plugin)
+- **Runtime:** Bun. Zero npm dependencies — all parsing (including YAML) is hand-rolled
+- **Config:** Hand-rolled YAML parser reads `.md-merger/config.yaml` or `$MD_MERGER_CONFIG` env var
+- **Entry point:** `src/index.ts` with `#!/usr/bin/env bun` shebang
+- **Existing CLI commands:** `emit`, `build`, `render`, `stats`, `doctor`
+- **Config schema** (`src/types.ts`): `Config` interface with `project`, `version`, `maxInheritDepth`, `storeFile`, `emitDirs`, `rootDirs`
+
+### How OpenCode Loads Plugins
+1. Plugin listed in `opencode.json` → `"plugin": ["@md-merger/opencode-plugin"]`
+2. OpenCode runs `bun install @md-merger/opencode-plugin` at startup, caches in `~/.cache/opencode/node_modules/`
+3. Imports the package via `import('@md-merger/opencode-plugin')` — resolves to `package.json` `main` field
+4. Expects a **default export** or **named export** conforming to `Plugin` type: `(input: PluginInput) => Promise<Hooks>`
+5. Runs **inside OpenCode's Bun server process** — not a subprocess
+6. Plugins receive `PluginInput` context: `{ client, project, directory, worktree, serverUrl, $ (BunShell), experimental_workspace }`
+
+### Key OpenCode Hook Types
+- **`config` hook:** Modifies OpenCode's runtime config object in place. Used by oh-my-opencode-slim to inject agents.
+- **`tool` hook:** Registers custom tool definitions.
+- **`event` hook:** Listen to lifecycle events.
+- **`chat.message` / `chat.params` / `chat.headers`:** Intercept LLM calls.
+
+### Plugin Config Hook Pattern (from oh-my-opencode-slim)
+- Agents are constructed as prompt strings in TypeScript
+- Registered via the `config` hook callback into the runtime `opencodeConfig.agent` object
+- Resolution order: Built-in defaults → user config → preset overrides
+- **Agents are NOT written to disk** — they are injected programmatically into the config object
+
+### Build Targets
+- CLI: `bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'`
+- Plugin: Shipped as raw `.ts` — Bun runtime imports directly, no build step needed
+
+### npm Publishing Requirements
+- `publishConfig: { access: "public", provenance: true }` in both package.json files
+- OIDC trusted publishing — no npm token secrets
+- `--provenance` flag requires `actions/setup-node`, not `bun publish`
+- Both packages share the same version number, published together on `v*` tags
 
 ## References
 
