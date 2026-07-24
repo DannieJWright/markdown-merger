@@ -1,10 +1,10 @@
-# evo-ai
+# md-merger
 
 Markdown-based AI agent/skill prompt management with inheritance. Flat 9-module source with a 4-stage core pipeline: **import → store → resolve → emit**. Supporting modules (`config`, `frontmatter`, `cli`, `types`, `index`) handle configuration, parsing, dispatch, and shared definitions. Zero npm dependencies.
 
 ## Overview
 
-Evo-ai is a CLI tool that manages AI agent and skill prompts as Markdown files with hierarchical inheritance. You write modular `.md` files with YAML frontmatter (`extends`, `type`, `abstract`), then Evo-ai ingests them into a versioned JSONL store, resolves inheritance chains via topological sort, and emits merged output files. This lets you build DRY prompt libraries where shared traits, behaviors, and guidelines are defined once and inherited by many agents or skills.
+Md-merger is a CLI tool that manages AI agent and skill prompts as Markdown files with hierarchical inheritance. You write modular `.md` files with YAML frontmatter (`extends`, `type`, `abstract`), then Md-merger ingests them into a versioned JSONL store, resolves inheritance chains via topological sort, and emits merged output files. This lets you build DRY prompt libraries where shared traits, behaviors, and guidelines are defined once and inherited by many agents or skills.
 
 The project is written in TypeScript with zero npm dependencies — all parsing, including YAML, is hand-rolled. It runs natively on Bun with no bundler or transpiler.
 
@@ -24,7 +24,7 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 |--------|---------|
 | `index.ts` | CLI entry point (`#!/usr/bin/env bun`), routes `process.argv` to `cli.run()` |
 | `cli.ts` | Command dispatcher — build, emit, render, stats, doctor, config |
-| `config.ts` | Hand-rolled YAML parser for `.evo/config.yaml`, default config resolution |
+| `config.ts` | Hand-rolled YAML parser for `.md-merger/config.yaml`, default config resolution |
 | `import.ts` | Recursively glob `.md` files from `rootDirs`, parse, write records to JSONL store |
 | `frontmatter.ts` | YAML frontmatter extraction, hierarchical section parsing (arbitrary nesting depth), markdown rendering |
 | `store.ts` | Append-only JSONL store — `readStore`, `appendRecord`, `findLatest`, `updateOrCreate` |
@@ -60,32 +60,32 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 ### Installation
 
 ```bash
-git clone https://github.com/your-org/evo-ai.git
-cd evo-ai
+git clone https://github.com/your-org/md-merger.git
+cd md-merger
 ```
 
 No `npm install` required — zero dependencies.
 
-> **Note:** `.evo/` is gitignored by default. Prompt source files in `.evo/agents-root/input/` will not be tracked unless you adjust your `.gitignore`.
+> **Note:** `.md-merger/` is gitignored by default. Prompt source files in `.md-merger/agents-root/input/` will not be tracked unless you adjust your `.gitignore`.
 
 ### Basic Usage
 
 ```bash
 # 1. Create config
-mkdir -p .evo
-cat > .evo/config.yaml << 'EOF'
+mkdir -p .md-merger
+cat > .md-merger/config.yaml << 'EOF'
 project: my-project
 version: "1"
 rootDirs:
-  - .evo/agents-root/input
+  - .md-merger/agents-root/input
 emitDirs:
   agent: output/agents
   skill: output/skills
 EOF
 
 # 2. Create a module with frontmatter
-mkdir -p .evo/agents-root/input/system
-cat > .evo/agents-root/input/system/base.md << 'EOF'
+mkdir -p .md-merger/agents-root/input/system
+cat > .md-merger/agents-root/input/system/base.md << 'EOF'
 ---
 abstract: true
 ---
@@ -96,7 +96,7 @@ You are an AI assistant.
 Be helpful and safe.
 EOF
 
-cat > .evo/agents-root/input/agents/coder.md << 'EOF'
+cat > .md-merger/agents-root/input/agents/coder.md << 'EOF'
 ---
 extends: [system/base]
 type: agent
@@ -115,16 +115,16 @@ just emit
 
 | Command | Description |
 |---------|-------------|
-| `evo build` | Import `.md` files from `rootDirs` into JSONL store |
-| `evo emit` | Resolve inheritance, generate merged output `.md` files |
-| `evo emit --dry-run` | Preview which files would be written without writing them |
-| `evo render <module>` | Resolve and print a single module's merged content to stdout (argument is required) |
-| `evo stats` | Show module counts: total, abstract, leaves (modules that nothing else extends) |
-| `evo doctor` | Validate references, detect circular dependencies |
-| `evo config show` | Print resolved config (path + values) |
-| `evo help` / `-h` / `--help` / (no args) | Print usage information |
+| `md-merger build` | Import `.md` files from `rootDirs` into JSONL store |
+| `md-merger emit` | Resolve inheritance, generate merged output `.md` files |
+| `md-merger emit --dry-run` | Preview which files would be written without writing them |
+| `md-merger render <module>` | Resolve and print a single module's merged content to stdout (argument is required) |
+| `md-merger stats` | Show module counts: total, abstract, leaves (modules that nothing else extends) |
+| `md-merger doctor` | Validate references, detect circular dependencies |
+| `md-merger config show` | Print resolved config (path + values) |
+| `md-merger help` / `-h` / `--help` / (no args) | Print usage information |
 
-**Planned (stubbed):** `config set` and `config unset` — commands exist but only print a warning and exit. Use `$EVO_CONFIG` env var for configuration overrides until implemented.
+**Planned (stubbed):** `config set` and `config unset` — commands exist but only print a warning and exit. Use `$MD_MERGER_CONFIG` env var for configuration overrides until implemented.
 
 Equivalent `just` commands exist for most of the above (`just build`, `just emit`, `just render <module>`, `just stats`, `just doctor`, etc.). Note: `config` subcommands are only available via direct CLI invocation (e.g. `bun ./src/index.ts config show`).
 
@@ -134,7 +134,7 @@ Equivalent `bun run` scripts exist in `package.json` (`bun run build`, `bun run 
 
 ### Config File
 
-Location: `.evo/config.yaml` (default) or `$EVO_CONFIG` env var. The env var also accepts HTTP URLs for remote config fetching. Hand-rolled YAML parser supports scalars, arrays (inline `[a, b]` or indented `- item`), booleans, integers, and nested key-value objects (how `emitDirs` works). No external YAML library.
+Location: `.md-merger/config.yaml` (default) or `$MD_MERGER_CONFIG` env var. The env var also accepts HTTP URLs for remote config fetching. Hand-rolled YAML parser supports scalars, arrays (inline `[a, b]` or indented `- item`), booleans, integers, and nested key-value objects (how `emitDirs` works). No external YAML library.
 
 ### Config Schema
 
@@ -158,14 +158,14 @@ emitDirs:
 
 # Directories containing .md source modules
 rootDirs:
-  - .evo/agents-root/input
+  - .md-merger/agents-root/input
 ```
 
 ### Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `EVO_CONFIG` | Path to config file or HTTP URL for remote config (overrides default `.evo/config.yaml`) |
+| `MD_MERGER_CONFIG` | Path to config file or HTTP URL for remote config (overrides default `.md-merger/config.yaml`) |
 
 ### Defaults
 
@@ -176,7 +176,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
   maxInheritDepth: 5,
   storeFile: "prompts.jsonl",
   emitDirs: { default: "output" },
-  rootDirs: [".evo/agents-root/input"],
+  rootDirs: [".md-merger/agents-root/input"],
 }
 ```
 
@@ -184,7 +184,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 
 ### Module Naming
 
-Module names are derived from the relative path within a `rootDir`. A file at `.evo/agents-root/input/agents/coder.md` inside rootDir `.evo/agents-root/input` gets module name `agents/coder`. Multiple rootDirs act as independent namespaces; first match wins.
+Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple rootDirs act as independent namespaces; first match wins.
 
 ### Frontmatter
 
@@ -253,7 +253,7 @@ Sections are parsed by heading level (`##` = level 1, `###` = level 2, etc.). He
 ### Project Structure
 
 ```
-evo-ai/
+md-merger/
 ├── src/                    # Application source (9 modules)
 │   ├── index.ts            # CLI entry point
 │   ├── cli.ts              # Command dispatcher
@@ -270,7 +270,7 @@ evo-ai/
 │   ├── resources/          # Test fixtures
 │   └── build/              # Test build artifacts (gitignored)
 ├── docs/                   # AI agent orchestration system prompt
-├── .evo/                   # Runtime config + input files (gitignored)
+├── .md-merger/                   # Runtime config + input files (gitignored)
 ├── bunfig.toml             # Disables peer-dependency installation (cosmetic with zero deps)
 ├── Justfile                # Task runner
 ├── package.json            # Scripts + metadata
@@ -322,7 +322,7 @@ Tests use Bun's built-in test runner (`bun:test`). Pattern:
 
 ```typescript
 import { describe, test, expect } from "bun:test";
-import { someExport } from "@evo/module-name";
+import { someExport } from "@md-merger/module-name";
 
 describe("feature", () => {
   test("does something", () => {
@@ -332,8 +332,8 @@ describe("feature", () => {
 });
 ```
 
-- Use `@evo/*` path aliases (configured in `tsconfig.json`)
-- For tests that need store/config: use `beforeEach`/`afterEach` to set `EVO_CONFIG` env var and clean up build directories
+- Use `@md-merger/*` path aliases (configured in `tsconfig.json`)
+- For tests that need store/config: use `beforeEach`/`afterEach` to set `MD_MERGER_CONFIG` env var and clean up build directories
 - See `tests/e2e/e2e.test.ts` for pattern of environment sandboxing
 
 ### Test Constraints (marked in test code)
@@ -351,7 +351,7 @@ Tests use constraint tags inline as comments (currently present in the E2E test 
 - **Naming**: `camelCase` for functions/variables, `PascalCase` for interfaces/types
 - **TypeScript**: strict mode, `noUncheckedIndexedAccess`, ESNext target/module
 - **Dependencies**: zero npm dependencies. All parsing (YAML, markdown sections) is hand-rolled
-- **Path aliases**: `@evo/*` maps to `./src/*` (configured in `tsconfig.json`)
+- **Path aliases**: `@md-merger/*` maps to `./src/*` (configured in `tsconfig.json`)
 - **Git**: Conventional Commits pattern. PR-linked commits use `(#N)` suffix
 
 ### Dependency Philosophy
@@ -389,8 +389,8 @@ If you need to add a dependency, justify it against these constraints.
 
 ### Working Pattern
 
-1. Use `@evo/*` imports for module references in tests (path alias from `tsconfig.json`)
-2. Tests should sandbox `EVO_CONFIG` in `beforeEach`/`afterEach` if they touch the store
+1. Use `@md-merger/*` imports for module references in tests (path alias from `tsconfig.json`)
+2. Tests should sandbox `MD_MERGER_CONFIG` in `beforeEach`/`afterEach` if they touch the store
 3. Run `just typecheck && just test` after writing code to verify
 4. For store-dependent tests, use a temporary build dir under `tests/build/`
 5. Use `process.chdir()` carefully — config resolution depends on `process.cwd()` (see C2 constraint tag in e2e tests)
