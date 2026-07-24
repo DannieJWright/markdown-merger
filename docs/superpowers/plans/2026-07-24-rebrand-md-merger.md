@@ -87,28 +87,23 @@ git commit -m "chore: rebrand package config from evo-ai to md-merger"
   - `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
   - `".evo/config.yaml"` → `".md-merger/config.yaml"`
 
-- [ ] **Step 2: Replace env var and help text in `src/cli.ts`**
+- [ ] **Step 2: Replace all branding strings in `src/cli.ts`**
 
   In `src/cli.ts`:
-  - `EVO_CONFIG` → `MD_MERGER_CONFIG`
-  - `.evo/config.yaml` → `.md-merger/config.yaml`
+  - `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG` (line 92)
+  - `.evo/config.yaml` → `.md-merger/config.yaml` (line 114)
+  - `"Usage: evo render <module>"` → `"Usage: md-merger render <module>"` (line 47)
+  - `"Usage: evo config [show|set|unset]"` → `"Usage: md-merger config [show|set|unset]"` (line 98)
+  - `Usage: evo <command>` → `Usage: md-merger <command>` (line 103, inside template literal)
 
 - [ ] **Step 3: Replace default path in `src/types.ts`**
 
   In `src/types.ts`:
   - `".evo/agents-root/input"` → `".md-merger/agents-root/input"`
 
-- [ ] **Step 4: Verify TypeScript compiles**
+- [ ] **Step 4: Skip verification**
 
-  Run: `tsc --noEmit`
-  Expected: No errors
-
-- [ ] **Step 5: Run full test suite to verify nothing is broken**
-
-  Run: `bun test`
-  Expected: All 104 tests pass (they will still reference `@evo/*` — that's fine, Task 3 fixes that)
-
-  Note: Tests may fail at this point because imports still say `@evo/*` but tsconfig now maps `@md-merger/*`. That's expected and intentional — Task 3 fixes the test imports. Skip this step and move to Step 6.
+  Both `tsc --noEmit` and `bun test` will fail at this point because `tsconfig.json` now maps `@md-merger/*` but test imports still say `@evo/*`. This is expected and intentional — Task 3 fixes it. Move directly to Step 5.
 
 - [ ] **Step 6: Commit**
 
@@ -148,7 +143,7 @@ git commit -m "chore: rebrand source code from evo-ai to md-merger"
   - `from "@evo/resolve"` → `from "@md-merger/resolve"`
   - `from "@evo/types"` → `from "@md-merger/types"`
 
-- [ ] **Step 2: Replace env var and path references in test files**
+- [ ] **Step 2: Replace env var, path, and assertion references in test files**
 
   In `tests/unit/config.test.ts`:
   - All `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
@@ -158,6 +153,7 @@ git commit -m "chore: rebrand source code from evo-ai to md-merger"
 
   In `tests/unit/cli.test.ts`:
   - All `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
+  - `"Usage: evo render <module>"` → `"Usage: md-merger render <module>"` (line 54 test assertion)
 
   In `tests/e2e/e2e.test.ts`:
   - All `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
@@ -213,10 +209,11 @@ git commit -m "chore: rebrand tests from evo-ai to md-merger"
   - `@evo/module-name` → `@md-merger/module-name`
   - `@evo/*` path alias references → `@md-merger/*`
 
-- [ ] **Step 3: Replace `.evo/` and `EVO_CONFIG` references in README**
+- [ ] **Step 3: Replace `.evo/` and env var references in README**
 
   In README.md:
   - All `.evo/` → `.md-merger/`
+  - All `$EVO_CONFIG` → `$MD_MERGER_CONFIG` (including `$EVO_CONFIG` env var references in prose, lines ~137, ~167)
   - All `EVO_CONFIG` → `MD_MERGER_CONFIG`
   - All `.evo/config.yaml` → `.md-merger/config.yaml`
 
@@ -245,11 +242,13 @@ git commit -m "chore: rebrand documentation from evo-ai to md-merger"
 
 - [ ] **Step 1: Grep for any remaining old branding**
 
-  Run: `grep -rn "evo-ai\|@evo/\|EVO_\|\.evo" --include="*.ts" --include="*.json" --include="*.yaml" --include="*.md" --include="*.toml" src/ tests/ *.json *.md *.toml .gitignore Justfile LICENSE`
+  Run: `rg -n "evo-ai|@evo/|EVO_|\.evo/" src/ tests/ *.json *.md *.toml .gitignore Justfile LICENSE`
 
-  Exclude from results: `.slim/deepwork/`, `node_modules/`, `dist/`, `Temp/`, `.superpowers/`, `docs/superpowers/`
+  Ignore matches in: `.slim/deepwork/`, `node_modules/`, `dist/`, `Temp/`, `.superpowers/`, `docs/superpowers/` — these are intentionally excluded from the rename scope (plan/spec docs are historical, deepwork files are auto-generated).
 
-  Expected: Zero matches in production files.
+  Note: Internal test temp directory names like `evo-test-store-`, `evo-test-emit-`, etc. are intentional — they're purely internal identifiers, user-invisible, and outside the rebrand scope. Leaving them as-is is fine.
+
+  Expected: Zero matches in production files (excluding the above intentional exclusions).
 
 - [ ] **Step 2: Run TypeScript check**
 
