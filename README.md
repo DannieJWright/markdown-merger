@@ -59,6 +59,22 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 
 ### Installation
 
+#### npm (CLI + Library)
+
+```bash
+npm install -g md-merger
+```
+
+#### OpenCode Plugin
+
+Add to your `opencode.json`:
+
+```json
+{ "plugins": ["@md-merger/opencode-plugin"] }
+```
+
+#### Local Development
+
 ```bash
 git clone https://github.com/your-org/md-merger.git
 cd md-merger
@@ -111,6 +127,24 @@ just emit
 # Output: output/agents/coder.md (merged output with system/base sections + coder overrides)
 ```
 
+## Usage
+
+### CLI
+
+```bash
+md-merger emit
+md-merger build
+md-merger render
+```
+
+### OpenCode Plugin
+
+When loaded as an OpenCode plugin, md-merger automatically:
+
+1. Reads your config from `$MD_MERGER_CONFIG` or `.md-merger/config.yaml`
+2. Resolves agent/skill inheritance
+3. Registers merged agents with OpenCode's runtime
+
 ## CLI Reference
 
 | Command | Description |
@@ -131,6 +165,18 @@ Equivalent `just` commands exist for most of the above (`just build`, `just emit
 Equivalent `bun run` scripts exist in `package.json` (`bun run build`, `bun run emit`, etc.) for the same subset of commands. Note: `bun run render <module>` requires a module argument.
 
 ## Configuration
+
+Place a `config.yaml` at `.md-merger/config.yaml` or set the `$MD_MERGER_CONFIG` environment variable:
+
+```yaml
+project: my-project
+version: "1"
+rootDirs:
+  - .md-merger/agents-root/input
+emitDirs:
+  agent: output/agents
+  skill: output/skills
+```
 
 ### Config File
 
