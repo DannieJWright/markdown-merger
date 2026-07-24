@@ -34,34 +34,34 @@
 - Consumes: Nothing (first task)
 - Produces: Updated config files so subsequent tasks see correct paths and aliases
 
-- [ ] **Step 1: Replace `evo-ai` with `md-merger` in `package.json`**
+- [x] **Step 1: Replace `evo-ai` with `md-merger` in `package.json`**
 
   In `package.json`:
   - `"name": "evo-ai"` → `"name": "md-merger"`
   - `"evo": "./src/index.ts"` → `"md-merger": "./src/index.ts"`
 
-- [ ] **Step 2: Replace `@evo/*` with `@md-merger/*` in `tsconfig.json`**
+- [x] **Step 2: Replace `@evo/*` with `@md-merger/*` in `tsconfig.json`**
 
   In `tsconfig.json`:
   - `"@evo/*": ["./src/*"]` → `"@md-merger/*": ["./src/*"]`
 
-- [ ] **Step 3: Replace `.evo/` with `.md-merger/` in `.gitignore`**
+- [x] **Step 3: Replace `.evo/` with `.md-merger/` in `.gitignore`**
 
   In `.gitignore`:
   - `.evo/` → `.md-merger/`
 
-- [ ] **Step 4: Replace `evo-ai` and `.evo` references in `Justfile`**
+- [x] **Step 4: Replace `evo-ai` and `.evo` references in `Justfile`**
 
   In `Justfile`:
   - All occurrences of `evo-ai` → `md-merger`
   - All occurrences of `.evo` → `.md-merger`
 
-- [ ] **Step 5: Replace `evo-ai` with `md-merger` in `LICENSE`**
+- [x] **Step 5: Replace `evo-ai` with `md-merger` in `LICENSE`**
 
   In `LICENSE`:
   - `evo-ai contributors` → `md-merger contributors`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add package.json tsconfig.json .gitignore Justfile LICENSE
@@ -103,9 +103,11 @@ git commit -m "chore: rebrand package config from evo-ai to md-merger"
 
 - [ ] **Step 4: Skip verification**
 
-  Both `tsc --noEmit` and `bun test` will fail at this point because `tsconfig.json` now maps `@md-merger/*` but test imports still say `@evo/*`. This is expected and intentional — Task 3 fixes it. Move directly to Step 5.
+  Both `tsc --noEmit` and `bun test` will fail at this point because `tsconfig.json` now maps `@md-merger/*` but test imports still say `@evo/*`. This is expected and intentional — Task 3 fixes both the test imports and source references together so they compile in sync. Move directly to Step 5.
 
-- [ ] **Step 6: Commit**
+  **Note (exception to global constraint):** The "all 104 tests must pass after each task" rule intentionally does not apply here. Tests *cannot* pass between Task 2 and Task 3 because the tsconfig path alias has changed (`@evo/*` → `@md-merger/*`) while the test import statements have not yet been updated. This is a known, expected break — both sides are corrected atomically in Task 3.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/config.ts src/cli.ts src/types.ts
@@ -145,11 +147,14 @@ git commit -m "chore: rebrand source code from evo-ai to md-merger"
 
 - [ ] **Step 2: Replace env var, path, and assertion references in test files**
 
+  The bulk find-and-replace will naturally update test description strings (e.g., `"uses EVO_CONFIG env var when set"` → `"uses MD_MERGER_CONFIG env var when set"`, `"defaults to .evo/config.yaml"` → `"defaults to .md-merger/config.yaml"`). This is correct and expected — description strings should reflect the renamed identifiers.
+
   In `tests/unit/config.test.ts`:
   - All `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
   - All `EVO_CONFIG` → `MD_MERGER_CONFIG`
   - `".evo/config.yaml"` → `".md-merger/config.yaml"`
   - `"evo-ai"` → `"md-merger"` (in expectations)
+  - Test description strings will be updated automatically by the above replacements
 
   In `tests/unit/cli.test.ts`:
   - All `process.env.EVO_CONFIG` → `process.env.MD_MERGER_CONFIG`
@@ -203,6 +208,8 @@ git commit -m "chore: rebrand tests from evo-ai to md-merger"
   - Clone URL `evo-ai.git` → `md-merger.git`
   - `cd evo-ai` → `cd md-merger`
 
+  **Note:** Step 1 and Step 3 replacements are mechanically safe and order-independent. `.evo/` dot-prefix does not overlap with `evo-ai/` (one is a dot-prefixed directory, the other a bare path), and `md-merger` contains no `.evo` substring, so there's no risk of cascading or premature replacement.
+
 - [ ] **Step 2: Replace `@evo/*` references in README examples**
 
   In README.md code examples:
@@ -242,11 +249,11 @@ git commit -m "chore: rebrand documentation from evo-ai to md-merger"
 
 - [ ] **Step 1: Grep for any remaining old branding**
 
-  Run: `rg -n "evo-ai|@evo/|EVO_|\.evo/" src/ tests/ *.json *.md *.toml .gitignore Justfile LICENSE`
+  Run: `rg -n "evo-ai|@evo/|EVO_CONFIG|\.evo/" src/ tests/ *.json *.md .gitignore Justfile LICENSE`
 
   Ignore matches in: `.slim/deepwork/`, `node_modules/`, `dist/`, `Temp/`, `.superpowers/`, `docs/superpowers/` — these are intentionally excluded from the rename scope (plan/spec docs are historical, deepwork files are auto-generated).
 
-  Note: Internal test temp directory names like `evo-test-store-`, `evo-test-emit-`, etc. are intentional — they're purely internal identifiers, user-invisible, and outside the rebrand scope. Leaving them as-is is fine.
+  Note: Internal test temp directory names like `evo-test-store-`, `evo-test-emit-`, `evo-test-import-`, `evo-test-resolve-` are intentionally excluded from the grep target scope. These are internal test isolation identifiers that serve no user-facing purpose — they exist solely to ensure test directory cleanup doesn't collide across parallel test runs. Renaming them provides no user-visible value while carrying a real risk of breaking test isolation behavior if not every reference is found and updated simultaneously.
 
   Expected: Zero matches in production files (excluding the above intentional exclusions).
 
