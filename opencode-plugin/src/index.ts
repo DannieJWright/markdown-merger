@@ -18,8 +18,12 @@ async function loadBundledDefaults(): Promise<Map<string, string>> {
   for (const entry of entries) {
     if (!entry.endsWith(".md")) continue;
     const agentName = entry.slice(0, -3); // strip .md
-    const content = await readFile(join(defaultsDir, entry), "utf-8");
-    defaults.set(agentName, content);
+    try {
+      const content = await readFile(join(defaultsDir, entry), "utf-8");
+      defaults.set(agentName, content);
+    } catch {
+      console.warn(`[md-merger] Failed to read bundled default: ${entry}`);
+    }
   }
   return defaults;
 }
@@ -50,10 +54,6 @@ export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
           const agentConfig = opencodeConfig.agent as Record<string, unknown>;
           for (const [name, content] of bundledDefaults) {
             agentConfig[name] = { prompt: content };
-          }
-        } else {
-          if (opencodeConfig.agent === undefined) {
-            opencodeConfig.agent = {};
           }
         }
       },

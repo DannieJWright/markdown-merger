@@ -35,7 +35,8 @@
     "stats": "bun src/index.ts stats",
     "doctor": "bun src/index.ts doctor",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run bundle"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
