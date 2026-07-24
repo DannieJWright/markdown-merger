@@ -68,15 +68,56 @@ Full emit pass (same logic as plugin)
 
 ## Package Details
 
+### Workspace Configuration
+
+Root `package.json` MUST include a `"workspaces"` field to enable cross-package resolution:
+```json
+{ "workspaces": ["opencode-plugin"] }
+```
+
+### Required package.json Fields (Root)
+
+The following fields MUST be added to the root `package.json` before publishing:
+```json
+{
+  "name": "md-merger",
+  "version": "1.0.0",
+  "description": "CLI tool for managing AI agent/skill prompts as Markdown files with hierarchical inheritance",
+  "type": "module",
+  "bin": { "md-merger": "./dist/index.js" },
+  "files": ["dist/", "defaults/", "README.md"],
+  "publishConfig": { "access": "public", "provenance": true },
+  "workspaces": ["opencode-plugin"],
+  "license": "MIT"
+}
+```
+
 ### md-merger (Root)
 
 - **Name:** `md-merger`
-- **Type:** Module, zero dependencies
+- **Type:** Module, zero runtime dependencies for CLI. Plugin package has deps.
 - **Bin:** `./dist/index.js` (bundled via Bun)
-- **Build:** `bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'`
+- **Build:** `bun build ./src/index.ts --outdir ./dist --target bun --banner 'entry:#!/usr/bin/env bun'`
 - **Files shipped:** `dist/`, `defaults/`, `README.md`
+- **Critical:** Build target is `bun` (not `node`) — CLI uses Bun-specific APIs like `Bun.file()`. The shebang MUST be `#!/usr/bin/env bun`
+- **npm publishing:** Requires `files` field to prevent shipping `tests/`, `docs/`, `.github/`
 
 ### @md-merger/opencode-plugin
+
+Required plugin `package.json`:
+```json
+{
+  "name": "@md-merger/opencode-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "files": ["src/"],
+  "dependencies": {
+    "md-merger": "workspace:*",
+    "@opencode-ai/plugin": "^latest"
+  }
+}
+```
 
 - **Name:** `@md-merger/opencode-plugin`
 - **Type:** Module
@@ -85,29 +126,47 @@ Full emit pass (same logic as plugin)
 - **package.json main:** `"./src/index.ts"` (relative to plugin package root)
 - **Imported by:** OpenCode's Bun runtime via `import('@md-merger/opencode-plugin')`
 - **Dependencies:** `md-merger` (workspace), `@opencode-ai/plugin` (types only)
+- **TS Config:** Shares root `tsconfig.json` — no separate compilation needed
+- **Shipped as:** Raw `.ts` — Bun runtime transpiles at runtime, no pre-build needed
+- **Version sync:** Both packages share the same version number. A pre-publish script synchronizes versions.
 
 ### Config Resolution Order
 
-1. Bundled defaults (shipped in npm `defaults/` directory)
-2. User config (`$MD_MERGER_CONFIG` → `.md-merger/config.yaml`)
-3. User config overrides all bundled defaults of the same name
+**Two distinct concepts DO NOT conflate:**
+
+- **`DEFAULT_CONFIG`** (TS object) — runtime defaults for `maxInheritDepth`, `storeFile`, `emitDirs`, `rootDirs`
+- **Bundled defaults** (npm-shipped `.md` files in `defaults/agents/` and `defaults/skills/`)
+
+Resolution order:
+1. Bundled defaults read from `defaults/` directory (shipped in npm package)
+2. User config from `$MD_MERGER_CONFIG` or `.md-merger/config.yaml`
+3. User config rootDirs replace, NOT merge with bundled default rootDirs
+4. `DEFAULT_CONFIG` provides runtime defaults for scalar fields (`maxInheritDepth`, `storeFile`)
+
+**How `defaults/` files are consumed:** The plugin registers bundled agent `.md` files into OpenCode's runtime config via the `config` hook. They are NOT written to disk. The plugin reads merged content (bundled + user), runs the emit pass, then injects the results into `config.agent`.
 
 ## Plugin Interface
 
 ```typescript
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 
-export default async (input: PluginInput) => {
-  // 1. Load + merge config
+// CRITICAL: Use named export, NOT default export — OpenCode may not consume defaults
+export const mdMergerPlugin: Plugin = async (input: PluginInput, options?) => {
+  // 1. Load + merge config (bundled defaults + user config)
   // 2. Run full emit pass (inheritance resolution, store write)
   // 3. Return config hook that injects merged agents/skills into OpenCode runtime
   return {
     config: async (cfg) => {
-      // Inject agents into cfg.agent
+      // Mutate cfg.agent in place — cfg is OpenCode's runtime config object
     }
   }
 }
 ```
+
+**Important notes:**
+- Use named export `mdMergerPlugin`, not `export default`. OpenCode resolves both but named is safer.
+- The `config` hook mutates its `cfg` parameter in-place and returns `void` (not `Promise<void>` return value).
+- The `config` hook signature is `config?: (input: Config) => Promise<void>` — the `Config` type here is OpenCode's internal config, not md-merger's.
 
 ## Bundled Defaults
 
@@ -151,7 +210,7 @@ Two workflows, both using npm Trusted Publishing (OIDC):
 - Config merging: bundled defaults → user config override
 - Emit pass: inheritance resolution, store file output
 - Plugin hooks: config hook injects correct agent definitions
-- CLI: bundle output runs under Node.js without Bun
+- CLI: bundle output runs under Bun (since CLI uses Bun-specific APIs like `Bun.file()`)
 - CI: full publish dry-run validates package integrity
 
 ## Implementation Context for Fresh Sessions
@@ -185,8 +244,15 @@ Two workflows, both using npm Trusted Publishing (OIDC):
 - **Agents are NOT written to disk** — they are injected programmatically into the config object
 
 ### Build Targets
-- CLI: `bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'`
+- CLI: `bun build ./src/index.ts --outdir ./dist --target bun --banner 'entry:#!/usr/bin/env bun'` — target MUST be `bun` because CLI uses `Bun.file()`. Using `--target node` will crash at runtime.
 - Plugin: Shipped as raw `.ts` — Bun runtime imports directly, no build step needed
+
+### Plugin Export Pattern
+**CRITICAL:** OpenCode loads plugins by resolving both default and named exports. Use named export to be safe:
+```typescript
+export const mdMergerPlugin: Plugin = async (input, options) => { ... }
+```
+Do NOT use only default export — some OpenCode versions may not consume it.
 
 ### npm Publishing Requirements
 - `publishConfig: { access: "public", provenance: true }` in both package.json files
