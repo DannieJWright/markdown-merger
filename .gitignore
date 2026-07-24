@@ -16,4 +16,4 @@ dist/
 .worktrees/
 
 # Test output
-tests/build/
+tests/build/.worktrees/
