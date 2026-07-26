@@ -1,9 +1,10 @@
 # Local RAG
 models/
 
-# Deepwork state
+# AI state
 .slim/deepwork/
 .superpowers/
+.opencode/
 
 # Project files
 node_modules/
