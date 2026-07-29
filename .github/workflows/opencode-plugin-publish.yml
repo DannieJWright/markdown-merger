@@ -19,6 +19,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
+        # Runs at workspace root for workspace resolution — do NOT set working-directory
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -40,7 +41,7 @@ jobs:
         env:
           MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
       - name: Replace workspace:* with semver for npm publish
-        working-directory: opencode-plugin
+        working-directory: packages/opencode-plugin
         env:
           MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
@@ -48,4 +49,4 @@ jobs:
           p.dependencies['@md-merger/cli'] = '^' + process.env.MD_MERGER_VERSION;
           require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
       - run: npm publish --provenance --access public
-        working-directory: opencode-plugin
+        working-directory: packages/opencode-plugin
