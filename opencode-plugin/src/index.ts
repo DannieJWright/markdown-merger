@@ -1,6 +1,6 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { loadConfig, emitAll } from "md-merger";
-import type { Config } from "md-merger";
+import { loadConfig, emitAll } from "@md-merger/cli";
+import type { Config } from "@md-merger/cli";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";

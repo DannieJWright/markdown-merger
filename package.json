@@ -1,5 +1,5 @@
 {
-  "name": "md-merger",
+  "name": "@md-merger/cli",
   "version": "1.0.0",
   "description": "CLI tool for managing AI agent/skill prompts as Markdown files with hierarchical inheritance",
   "type": "module",

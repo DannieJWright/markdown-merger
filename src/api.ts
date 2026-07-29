@@ -4,3 +4,4 @@ export { loadConfig, getConfigPath } from "./config";
 export { emitAll } from "./emit";
 export type { Config } from "./types";
 export { DEFAULT_CONFIG, DEFAULT_MAX_INHERIT_DEPTH } from "./types";
+export { parseCliArgs, run } from "./cli";

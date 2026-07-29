@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 
 // Mock md-merger module to avoid hitting the real filesystem
-mock.module("md-merger", () => ({
+mock.module("@md-merger/cli", () => ({
   loadConfig: mock(async () => ({ maxInheritDepth: 5, storeFile: "prompts.jsonl", emitDirs: {}, rootDirs: [] })),
   emitAll: mock(async () => []),
   DEFAULT_CONFIG: { maxInheritDepth: 5, storeFile: "prompts.jsonl", emitDirs: {}, rootDirs: [] },

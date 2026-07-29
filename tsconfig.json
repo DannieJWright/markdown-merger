@@ -12,7 +12,8 @@
     "rootDir": ".",
     "paths": {
       "@md-merger/*": ["./src/*"],
-      "md-merger": ["./src/api.ts"]
+      "md-merger": ["./src/api.ts"],
+      "@md-merger/cli": ["./src/api.ts"]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "opencode-plugin/**/*.ts"],
