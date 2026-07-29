@@ -96,13 +96,29 @@ All files from root `src/` → `packages/cli/src/`:
 
 ### 5. Tests — Split by Package
 
+**All CLI-related tests → `packages/cli/tests/`:**
+
 | Test | Destination | Reason |
 |------|------------|--------|
 | `tests/unit/api.test.ts` | `packages/cli/tests/unit/api.test.ts` | Tests CLI API |
+| `tests/unit/cli.test.ts` | `packages/cli/tests/unit/cli.test.ts` | Tests CLI module |
 | `tests/unit/config.test.ts` | `packages/cli/tests/unit/config.test.ts` | Tests CLI config |
-| `tests/unit/plugin.test.ts` | `packages/opencode-plugin/tests/plugin.test.ts` | Tests plugin surface |
+| `tests/unit/emit.test.ts` | `packages/cli/tests/unit/emit.test.ts` | Tests emit module |
+| `tests/unit/frontmatter.test.ts` | `packages/cli/tests/unit/frontmatter.test.ts` | Tests frontmatter module |
+| `tests/unit/import.test.ts` | `packages/cli/tests/unit/import.test.ts` | Tests import module |
+| `tests/unit/resolve.test.ts` | `packages/cli/tests/unit/resolve.test.ts` | Tests resolve module |
+| `tests/unit/store.test.ts` | `packages/cli/tests/unit/store.test.ts` | Tests store module |
 | `tests/e2e/e2e.test.ts` | `packages/cli/tests/e2e/e2e.test.ts` | Tests CLI e2e |
 | `tests/resources/` | `packages/cli/tests/resources/` | Shared test fixtures |
+
+**Plugin tests → `packages/opencode-plugin/tests/`:**
+
+| Test | Destination | Reason |
+|------|------------|--------|
+| `tests/unit/plugin.test.ts` | `packages/opencode-plugin/tests/plugin.test.ts` | Tests plugin surface |
+
+**Build output stays excluded:**
+- `tests/build/` remains at repo root in `.gitignore`, excluded from both packages and typecheck
 
 ### 6. `tsconfig.json` — Updated Paths
 
