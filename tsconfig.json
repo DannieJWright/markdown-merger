@@ -12,7 +12,6 @@
     "rootDir": ".",
     "paths": {
       "@md-merger/*": ["./src/*"],
-      "md-merger": ["./src/api.ts"],
       "@md-merger/cli": ["./src/api.ts"]
     }
   },
