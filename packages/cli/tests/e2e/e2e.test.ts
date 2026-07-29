@@ -4,9 +4,9 @@ import { loadConfig } from "../../src/config";
 import { readFileSync, readdirSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-const PROJECT_ROOT = resolve(import.meta.dirname, "..", "..");
-const SCENARIO_ROOT = resolve(PROJECT_ROOT, "tests", "resources", "agents-root");
-const BUILD_DIR = resolve(PROJECT_ROOT, "tests", "build");
+const PROJECT_ROOT = resolve(import.meta.dirname, "..", "..", "..", "..");
+const SCENARIO_ROOT = resolve(PROJECT_ROOT, "packages", "cli", "tests", "resources", "agents-root");
+const BUILD_DIR = resolve(PROJECT_ROOT, "packages", "cli", "tests", "build");
 
 /** Walk a directory and return relative paths of all files */
 function collectFiles(dir: string): string[] {
