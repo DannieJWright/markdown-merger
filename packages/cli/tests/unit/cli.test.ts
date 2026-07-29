@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { parseCliArgs, run } from "@md-merger/cli";
 import { resolve } from "node:path";
 
-const PROJECT_ROOT = resolve(import.meta.dirname, "..", "..");
+const PACKAGE_ROOT = resolve(import.meta.dirname, "..", "..");
 
 describe("parseCliArgs", () => {
   test("defaults to help when no args", () => {
@@ -39,7 +39,7 @@ describe("parseCliArgs", () => {
 describe("run error paths", () => {
   const origEnv = process.env.MD_MERGER_CONFIG;
   beforeEach(() => {
-    process.env.MD_MERGER_CONFIG = resolve(PROJECT_ROOT, "tests", "resources", "agents-root", "config.yaml");
+    process.env.MD_MERGER_CONFIG = resolve(PACKAGE_ROOT, "tests", "resources", "agents-root", "config.yaml");
   });
   afterEach(() => {
     if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;

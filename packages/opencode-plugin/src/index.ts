@@ -7,7 +7,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Defaults are bundled in the plugin package via prepublishOnly (copies ../../defaults/ to ./defaults/)
+// Defaults are bundled in the plugin package via prepublishOnly (copies ../cli/defaults/ to ./defaults/)
 const defaultsDir = join(__dirname, "..", "defaults", "agents");
 
 async function loadBundledDefaults(): Promise<Map<string, string>> {
