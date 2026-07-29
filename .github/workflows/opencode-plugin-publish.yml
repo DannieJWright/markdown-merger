@@ -25,17 +25,17 @@ jobs:
       - name: Extract version without v prefix
         id: version
         run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
-      - name: Wait for md-merger to be published
+      - name: Wait for @md-merger/cli to be published
         run: |
           for i in $(seq 1 10); do
-            if npm view md-merger@$MD_MERGER_VERSION version >/dev/null 2>&1; then
-              echo "md-merger@$MD_MERGER_VERSION is available"
+            if npm view @md-merger/cli@$MD_MERGER_VERSION version >/dev/null 2>&1; then
+              echo "@md-merger/cli@$MD_MERGER_VERSION is available"
               exit 0
             fi
-            echo "Waiting for md-merger to publish... attempt $i/10"
+            echo "Waiting for @md-merger/cli to publish... attempt $i/10"
             sleep 30
           done
-          echo "ERROR: md-merger failed to publish within 5 minutes"
+          echo "ERROR: @md-merger/cli failed to publish within 5 minutes"
           exit 1
         env:
           MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
@@ -45,7 +45,8 @@ jobs:
           MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           node -e "const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
-          p.dependencies['md-merger'] = '^' + process.env.MD_MERGER_VERSION;
+          delete p.dependencies['md-merger'];
+          p.dependencies['@md-merger/cli'] = '^' + process.env.MD_MERGER_VERSION;
           require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
       - run: npm publish --provenance --access public
         working-directory: opencode-plugin

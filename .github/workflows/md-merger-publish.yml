@@ -1,4 +1,4 @@
-name: Publish md-merger to npm
+name: Publish @md-merger/cli to npm
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  publish-md-merger:
+  publish-cli:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
