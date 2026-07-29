@@ -49,5 +49,3 @@ jobs:
           require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
       - run: npm publish --provenance --access public
         working-directory: opencode-plugin
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
