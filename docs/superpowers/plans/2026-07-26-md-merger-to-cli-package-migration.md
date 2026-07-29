@@ -291,17 +291,12 @@ git commit -m "refactor: update CI workflows for @md-merger/cli package name"
 
 **Files:**
 - Modify: `README.md` (package name references as npm package)
-- Modify: `docs/superpowers/plans/2026-07-24-md-merger-deployment.md`
-- Modify: `docs/superpowers/specs/2026-07-24-md-merger-deployment-design.md`
-- Scan: `.slim/deepwork/md-merger-deployment.md`
 - No change: `LICENSE` (see note below)
 
 **Interfaces:**
 - No runtime/code changes — documentation only
 
 > **Note on LICENSE:** The `LICENSE` file contains `Copyright (c) 2026 md-merger contributors`. Leave this as-is — `md-merger` here is a project/copyright name, not an npm package name. No change needed.
->
-> - Note: Also scan `.slim/deepwork/md-merger-deployment.md` for any npm package name references and update if needed.
 
 **Naming boundaries for this task:**
 - CHANGE: `"md-merger"` when it appears as the npm **package name** (in `package.json` examples, `npm install` commands, import statements in docs, `dependencies` entries)
@@ -321,24 +316,11 @@ Also scan for `"md-merger"` appearing as a **package name in code blocks** and u
 - `dependencies: { "md-merger": "..." }` → `dependencies: { "@md-merger/cli": "..." }`
 - `import ... from "md-merger"` → `import ... from "@md-merger/cli"`
 
-- [ ] **Step 2: Update deployment plan doc**
-
-In `docs/superpowers/plans/2026-07-24-md-merger-deployment.md`:
-- Package name references: `md-merger` → `@md-merger/cli` (in architecture description and Task definitions where it refers to the npm package)
-- Keep CLI command references: `md-merger build`, `md-merger emit`, etc.
-- Keep directory/env var references: `.md-merger/`, `MD_MERGER_CONFIG`
-
-- [ ] **Step 3: Update design spec doc**
-
-In `docs/superpowers/specs/2026-07-24-md-merger-deployment-design.md`:
-- Same pattern — package name references only
-- Keep all CLI command, directory, and env var references unchanged
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
-git add README.md docs/superpowers/plans/2026-07-24-md-merger-deployment.md docs/superpowers/specs/2026-07-24-md-merger-deployment-design.md
-git commit -m "docs: update package name references from md-merger to @md-merger/cli"
+git add README.md
+git commit -m "docs: update README package name references from md-merger to @md-merger/cli"
 ```
 
 ---
