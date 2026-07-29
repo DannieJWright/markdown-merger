@@ -1,3 +1,6 @@
+# NOTE: All paths below are relative to the repo root (process.cwd()).
+# This config must be used with CWD set to the repository root,
+# which is how the e2e tests run it (workingDir: repoRoot).
 project: md-merger
 version: "1"
 maxInheritDepth: 5

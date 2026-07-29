@@ -8,6 +8,7 @@ models/
 
 # Project files
 node_modules/
+packages/*/node_modules/
 dist/
 
 # Generated files

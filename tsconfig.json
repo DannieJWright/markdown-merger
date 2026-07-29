@@ -7,7 +7,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "outDir": "dist",
     "types": ["node", "bun-types"],
     "paths": {
       "@md-merger/*": ["./packages/cli/src/*"],
