@@ -1,0 +1,39 @@
+{
+  "name": "@md-merger/cli",
+  "version": "1.0.0",
+  "description": "CLI tool for managing AI agent/skill prompts as Markdown files with hierarchical inheritance",
+  "type": "module",
+  "bin": {
+    "md-merger": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/api.ts",
+      "types": "./src/api.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "defaults/",
+    "src/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "bundle": "bun build ./src/index.ts --outdir ./dist --target node --banner 'entry:#!/usr/bin/env node'",
+    "build": "bun src/index.ts build",
+    "emit": "bun src/index.ts emit",
+    "render": "bun src/index.ts render",
+    "stats": "bun src/index.ts stats",
+    "doctor": "bun src/index.ts doctor",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "node -e \"require('child_process').execSync('bun run bundle', {stdio: 'inherit'})\""
+  }
+}
