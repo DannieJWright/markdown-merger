@@ -62,7 +62,7 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 #### npm (CLI + Library)
 
 ```bash
-npm install -g md-merger
+npm install -g @md-merger/cli
 ```
 
 #### OpenCode Plugin
