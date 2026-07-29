@@ -1,9 +1,11 @@
 name: Publish opencode-plugin to npm
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: ["Publish @md-merger/cli to npm"]
+    types:
+      - completed
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,23 +25,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Extract version without v prefix
+      - name: Get latest @md-merger/cli version from npm
         id: version
-        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
-      - name: Wait for @md-merger/cli to be published
-        run: |
-          for i in $(seq 1 10); do
-            if npm view @md-merger/cli@$MD_MERGER_VERSION version >/dev/null 2>&1; then
-              echo "@md-merger/cli@$MD_MERGER_VERSION is available"
-              exit 0
-            fi
-            echo "Waiting for @md-merger/cli to publish... attempt $i/10"
-            sleep 30
-          done
-          echo "ERROR: @md-merger/cli failed to publish within 5 minutes"
-          exit 1
-        env:
-          MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: echo "VERSION=$(npm view @md-merger/cli dist-tags.latest)" >> $GITHUB_OUTPUT
       - name: Replace workspace:* with semver for npm publish
         working-directory: packages/opencode-plugin
         env:

@@ -9,7 +9,7 @@
     "@opencode-ai/plugin": "^1.0.0"
   },
   "scripts": {
-    "prepublishOnly": "node -e \"const p=require('./package.json'); p.dependencies['@md-merger/cli']='^' + p.version; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\n'); const {cpSync, existsSync} = require('fs'); if (existsSync('../../cli/defaults')) cpSync('../../cli/defaults', './defaults', {recursive:true}); else console.warn('defaults/ not found - skip copy')\""
+    "prepublishOnly": "node -e \"const p=require('./package.json'); p.dependencies['@md-merger/cli']='^' + p.version; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\n'); const {cpSync, existsSync} = require('fs'); if (existsSync('../cli/defaults')) cpSync('../cli/defaults', './defaults', {recursive:true}); else console.warn('defaults/ not found - skip copy')\""
   },
   "publishConfig": {
     "access": "public",
