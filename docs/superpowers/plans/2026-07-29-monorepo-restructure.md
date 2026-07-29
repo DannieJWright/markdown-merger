@@ -126,7 +126,29 @@ git commit -m "refactor: create packages/cli/package.json, make root private mon
 
 ---
 
-### Task 3: Move opencode-plugin to packages/opencode-plugin/
+### Task 3: Move defaults/ to packages/cli/defaults/
+
+**Files:**
+- Move: `defaults/` → `packages/cli/defaults/`
+
+- [ ] **Step 1: Move defaults directory using git mv**
+
+```bash
+git mv defaults packages/cli/defaults
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add packages/cli/defaults
+git commit -m "refactor: move defaults/ to packages/cli/defaults/"
+```
+
+Note: The opencode-plugin's `prepublishOnly` defaults path will be updated in Task 4 after the plugin is moved to `packages/opencode-plugin/`.
+
+---
+
+### Task 4: Move opencode-plugin to packages/opencode-plugin/
 
 **Files:**
 - Move: `opencode-plugin/` → `packages/opencode-plugin/`
@@ -137,11 +159,12 @@ git commit -m "refactor: create packages/cli/package.json, make root private mon
 git mv opencode-plugin packages/opencode-plugin
 ```
 
-- [ ] **Step 2: Update plugin prepublishOnly script path** — the `../defaults` path becomes `../../defaults`
+- [ ] **Step 2: Update plugin prepublishOnly script path** — the `../defaults` path becomes `../../cli/defaults`
 
-Modify `packages/opencode-plugin/package.json` line 12:
+Modify `packages/opencode-plugin/package.json` line 12 — three changes:
+1. Move path: `../defaults` → `../../cli/defaults` (from `packages/opencode-plugin/`, two levels up to `packages/`, then `cli/defaults/`)
 ```json
-"prepublishOnly": "node -e \"const p=require('./package.json'); p.dependencies['@md-merger/cli']='^' + p.version; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\n'); const {cpSync, existsSync} = require('fs'); if (existsSync('../../defaults')) cpSync('../../defaults', './defaults', {recursive:true}); else console.warn('defaults/ not found - skip copy')\""
+"prepublishOnly": "node -e \"const p=require('./package.json'); p.dependencies['@md-merger/cli']='^' + p.version; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\n'); const {cpSync, existsSync} = require('fs'); if (existsSync('../../cli/defaults')) cpSync('../../cli/defaults', './defaults', {recursive:true}); else console.warn('defaults/ not found - skip copy')\""
 ```
 
 - [ ] **Step 3: Commit**
@@ -153,7 +176,7 @@ git commit -m "refactor: move opencode-plugin to packages/opencode-plugin/, fix 
 
 ---
 
-### Task 4: Move tests to their respective packages
+### Task 5: Move tests to their respective packages
 
 **Files:**
 - Move: `tests/unit/api.test.ts` → `packages/cli/tests/unit/api.test.ts`
@@ -216,43 +239,32 @@ git commit -m "refactor: move tests to their respective packages"
 
 ---
 
-### Task 5: Update test import paths
+### Task 6: Update test import paths
 
 **Files:**
 - Modify: `packages/cli/tests/unit/api.test.ts`
 - Modify: `packages/cli/tests/e2e/e2e.test.ts`
 - Modify: `packages/opencode-plugin/tests/plugin.test.ts`
 
-- [ ] **Step 1: Update api.test.ts imports** — change `"../../src/api"` → `"../src/api"`
+- [ ] **Step 1: Verify api.test.ts imports are correct** — no change needed
 
-File: `packages/cli/tests/unit/api.test.ts` line 2:
-```typescript
-import * as api from "../../src/api";
-```
-Change to:
-```typescript
-import * as api from "../src/api";
-```
+The existing `"../../src/api"` import from `packages/cli/tests/unit/api.test.ts` correctly resolves to `packages/cli/src/api.ts` after the move. No modification required.
 
-- [ ] **Step 2: Update e2e.test.ts imports** — change `"../../src/cli"` → `"../src/cli"` and `"../../src/config"` → `"../src/config"`
+- [ ] **Step 2: Verify e2e.test.ts imports are correct** — no import change needed
 
-File: `packages/cli/tests/e2e/e2e.test.ts` lines 2-3:
-```typescript
-import { run } from "../../src/cli";
-import { loadConfig } from "../../src/config";
-```
-Change to:
-```typescript
-import { run } from "../src/cli";
-import { loadConfig } from "../src/config";
-```
+The existing `"../../src/cli"` and `"../../src/config"` imports from `packages/cli/tests/e2e/e2e.test.ts` correctly resolve to `packages/cli/src/cli.ts` and `packages/cli/src/config.ts` after the move. No modification required.
 
-Also update line 8 — `SCENARIO_ROOT` path:
+- [ ] **Step 2b: Update e2e.test.ts hardcoded paths** — `PROJECT_ROOT` needs 4 dots; fix `SCENARIO_ROOT` AND `BUILD_DIR`
+
+File: `packages/cli/tests/e2e/e2e.test.ts` — update all three path constants:
+
 ```typescript
 const PROJECT_ROOT = resolve(import.meta.dirname, "..", "..", "..", "..");
 const SCENARIO_ROOT = resolve(PROJECT_ROOT, "packages", "cli", "tests", "resources", "agents-root");
-const BUILD_DIR = resolve(PROJECT_ROOT, "tests", "build");
+const BUILD_DIR = resolve(PROJECT_ROOT, "packages", "cli", "tests", "build");
 ```
+
+Note: The old `BUILD_DIR` would resolve to `evo-ai/tests/build/` (nonexistent after restructure). It must point to `packages/cli/tests/build/`.
 
 - [ ] **Step 3: Update plugin.test.ts imports** — change `"../../opencode-plugin/src/index"` → `"../src/index"`
 
@@ -274,7 +286,7 @@ git commit -m "refactor: update test import paths for new directory structure"
 
 ---
 
-### Task 6: Update tsconfig.json paths
+### Task 7: Update tsconfig.json paths
 
 **Files:**
 - Modify: `tsconfig.json`
@@ -312,7 +324,7 @@ git commit -m "refactor: update tsconfig.json paths for new workspace structure"
 
 ---
 
-### Task 7: Update Justfile paths
+### Task 8: Update Justfile paths
 
 **Files:**
 - Modify: `Justfile`
@@ -351,7 +363,7 @@ git commit -m "refactor: update Justfile paths for new workspace structure"
 
 ---
 
-### Task 8: Verify bun install, test, and typecheck
+### Task 9: Verify bun install, test, and typecheck
 
 **Verification only — no file changes.**
 
@@ -407,7 +419,7 @@ If any step fails, investigate and fix before proceeding. This is the critical P
 
 ---
 
-### Task 9: Update md-merger-publish.yml workflow
+### Task 10: Update md-merger-publish.yml workflow
 
 **Files:**
 - Modify: `.github/workflows/md-merger-publish.yml`
@@ -436,7 +448,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-        working-directory: packages/cli
+        # Runs at workspace root for workspace resolution — do NOT set working-directory
       - run: bun run bundle
         working-directory: packages/cli
       - uses: actions/setup-node@v6
@@ -455,7 +467,7 @@ git commit -m "ci: update md-merger publish workflow for new packages/cli path"
 
 ---
 
-### Task 10: Update opencode-plugin-publish.yml workflow
+### Task 11: Update opencode-plugin-publish.yml workflow
 
 **Files:**
 - Modify: `.github/workflows/opencode-plugin-publish.yml`
@@ -484,7 +496,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-        working-directory: packages/opencode-plugin
+        # Runs at workspace root for workspace resolution — do NOT set working-directory
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -526,7 +538,7 @@ git commit -m "ci: update opencode-plugin publish workflow for new packages/open
 
 ---
 
-### Task 11: Final verification and git history cleanup
+### Task 12: Final verification and git history cleanup
 
 **Verification only — cleanup if needed.**
 
@@ -568,15 +580,17 @@ git commit -m "refactor: monorepo structure complete — cli and plugin under pa
 - [x] Root package.json becomes private container (Task 2)
 - [x] packages/cli/package.json created (Task 2)
 - [x] Source files moved to packages/cli/src/ (Task 1)
-- [x] CLI tests moved to packages/cli/tests/ (Task 4)
-- [x] Plugin test moved to packages/opencode-plugin/tests/ (Task 4)
-- [x] Test import paths updated (Task 5)
-- [x] tsconfig.json updated (Task 6)
-- [x] Justfile updated (Task 7)
-- [x] CI workflows updated (Tasks 9-10)
-- [x] Plugin prepublishOnly defaults path fixed (Task 3)
-- [x] bun install + test + typecheck verification (Task 8)
-- [x] Final verification (Task 11)
+- [x] defaults/ moved to packages/cli/defaults/ (Task 3)
+- [x] CLI tests moved to packages/cli/tests/ (Task 5)
+- [x] Plugin test moved to packages/opencode-plugin/tests/ (Task 5)
+- [x] api.test.ts & e2e.test.ts imports verified correct (Task 6)
+- [x] e2e.test.ts BUILD_DIR path fixed (Task 6)
+- [x] tsconfig.json updated (Task 7)
+- [x] Justfile updated (Task 8)
+- [x] bun install + test + typecheck verification (Task 9)
+- [x] CI workflows updated (Tasks 10-11)
+- [x] CI workflows bun install at workspace root (Tasks 10-11)
+- [x] Final verification (Task 12)
 
 **Placeholder scan:** No TBDs, TODOs, or vague steps found.
 
