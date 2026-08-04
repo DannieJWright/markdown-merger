@@ -1,13 +1,17 @@
 {
-  "name": "@md-merger/monorepo",
-  "private": true,
-  "workspaces": ["packages/*"],
-  "devDependencies": {
-    "@types/node": "^26.1.1",
-    "bun-types": "^1.3.14",
-    "typescript": "^7.0.2"
+  "name": "evo-ai",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "evo": "./src/index.ts"
   },
   "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun src/index.ts build",
+    "emit": "bun src/index.ts emit",
+    "render": "bun src/index.ts render",
+    "stats": "bun src/index.ts stats",
+    "doctor": "bun src/index.ts doctor",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   }

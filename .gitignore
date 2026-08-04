@@ -1,21 +1,19 @@
 # Local RAG
 models/
 
-# AI state
+# Deepwork state
 .slim/deepwork/
 .superpowers/
-.opencode/
 
 # Project files
 node_modules/
-packages/*/node_modules/
 dist/
 
 # Generated files
-.md-merger/
+.evo/
 
 # Worktrees
 .worktrees/
 
 # Test output
-packages/*/tests/build/
+tests/build/
