@@ -3,32 +3,39 @@ import { loadConfig, build, emitAll } from "@md-merger/cli";
 import type { Config } from "@md-merger/cli";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { join, dirname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Defaults are bundled in the plugin package via prepublishOnly (copies ../cli/defaults/ to ./defaults/)
 const defaultsDir = join(__dirname, "..", "defaults", "agents");
 
-async function loadBundledDefaults(): Promise<Map<string, string>> {
+export async function loadBundledDefaults(root = defaultsDir): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
-  if (!existsSync(defaultsDir)) return defaults;
-  // Read each .md file in defaults/agents/
-  const entries = await readdir(defaultsDir);
+  if (!existsSync(root)) return defaults;
+  // Preserve the normalized path under defaults/agents so nested names cannot collide.
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  entries.sort((a, b) => {
+    const aPath = join(a.parentPath, a.name);
+    const bPath = join(b.parentPath, b.name);
+    return aPath.localeCompare(bPath);
+  });
   for (const entry of entries) {
-    if (!entry.endsWith(".md")) continue;
-    const agentName = entry.slice(0, -3); // strip .md
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const entryPath = join(entry.parentPath, entry.name);
+    const agentName = relative(root, entryPath).split(sep).join("/").replace(/\.md$/, "");
     try {
-      const content = await readFile(join(defaultsDir, entry), "utf-8");
+      const content = await readFile(entryPath, "utf-8");
       defaults.set(agentName, content);
     } catch {
-      console.warn(`[md-merger] Failed to read bundled default: ${entry}`);
+      console.warn(`[md-merger] Failed to read bundled default: ${entryPath}`);
     }
   }
   return defaults;
 }
 
 export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
+  const previousCwd = process.cwd();
   try {
     const bundledDefaults = await loadBundledDefaults();
     if (_input.directory) process.chdir(_input.directory);
@@ -75,5 +82,7 @@ export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
   } catch (err) {
     console.error("[md-merger] Plugin initialization failed:", err);
     return {};
+  } finally {
+    process.chdir(previousCwd);
   }
 };
