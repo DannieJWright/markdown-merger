@@ -1,5 +1,5 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { loadConfig, emitAll } from "@md-merger/cli";
+import { loadConfig, build, emitAll } from "@md-merger/cli";
 import type { Config } from "@md-merger/cli";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
@@ -33,6 +33,7 @@ export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
     const bundledDefaults = await loadBundledDefaults();
     if (_input.directory) process.chdir(_input.directory);
     const config = await loadConfig();
+    await build(config.rootDirs, config.storeFile, config.project);
     const writtenPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
 
     if (writtenPaths.length === 0 && bundledDefaults.size > 0) {

@@ -4,16 +4,19 @@ models/
 # Deepwork state
 .slim/deepwork/
 .superpowers/
+.opencode/
 
 # Project files
 node_modules/
+packages/*/node_modules/
+packages/opencode-plugin/defaults/
 dist/
 
 # Generated files
-.evo/
+.md-merger/
 
 # Worktrees
 .worktrees/
 
 # Test output
-tests/build/
+packages/*/tests/build/
