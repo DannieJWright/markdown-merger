@@ -7,9 +7,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "outDir": "dist",
-    "types": ["node", "bun"],
-    "rootDir": "src"
+    "types": ["node", "bun-types"],
+    "paths": {
+      "@md-merger/*": ["./packages/cli/src/*"],
+      "@md-merger/cli": ["./packages/cli/src/api.ts"]
+    }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["packages/cli/src/**/*.ts", "packages/cli/tests/**/*.ts", "packages/opencode-plugin/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
