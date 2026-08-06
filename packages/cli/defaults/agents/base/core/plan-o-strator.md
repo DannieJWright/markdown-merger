@@ -1,7 +1,7 @@
 ---
 type: agent
 extends: [base/BasePrimaryAgent]
-abstract: true
+abstract: false
 ---
 
 ## Responsibility
