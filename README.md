@@ -46,7 +46,7 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 | Runtime | Bun (native execution, no bundler/transpiler) |
 | Build | `tsc --noEmit` (type-checking only, no emission) |
 | Task Runner | Just (`Justfile` wraps `bun` commands) |
-| Testing | \`bun:test\` (104 tests across 8 files) |
+| Testing | \`bun:test\` (124 tests across 10 files) |
 | Dependencies | **Zero** — all parsing (including YAML) is hand-rolled. Only Node.js built-ins + Bun runtime APIs |
 | License | MIT (plus MIT-licensed adapted code from Canopy) |
 
@@ -55,7 +55,7 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 ### Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.0
-- [Just](https://just.systems/) (optional — `bun run` scripts in `package.json` work too)
+- [Just](https://just.systems/) (optional — root scripts are limited to `bun test` and `bun run typecheck`)
 
 ### Installation
 
@@ -225,7 +225,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 {
   maxInheritDepth: 5,
   storeFile: "prompts.jsonl",
-  emitDirs: { default: "output" },
+  emitDirs: { default: "output", agent: ".opencode/agents", skill: ".opencode/skills" },
   rootDirs: [".md-merger/agents-root/input"],
 }
 ```
@@ -339,9 +339,6 @@ just typecheck
 
 # Run tests
 just test
-
-# Quick dev cycle: watch mode
-bun run dev
 
 # Build
 just build
