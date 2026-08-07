@@ -160,9 +160,13 @@ When loaded as an OpenCode plugin, md-merger automatically:
 
 **Planned (stubbed):** `config set` and `config unset` — commands exist but only print a warning and exit. Use `$MD_MERGER_CONFIG` env var for configuration overrides until implemented.
 
-Equivalent `just` commands exist for most of the above (`just build`, `just emit`, `just render <module>`, `just stats`, `just doctor`, etc.). Note: `config` subcommands are only available via direct CLI invocation (e.g. `bun ./packages/cli/src/index.ts config show`).
+Verified commands:
 
-Equivalent `bun run` scripts exist in `package.json` (`bun run build`, `bun run emit`, etc.) for the same subset of commands. Note: `bun run render <module>` requires a module argument.
+- `bun test` — run the full workspace test suite
+- `bun run typecheck` — run `tsc --noEmit` across the workspace
+- `bun test --cwd packages/cli` — run CLI package tests
+- `bun test --cwd packages/opencode-plugin` — run plugin package tests
+- `just build`, `just emit`, `just render`, `just doctor`, `just stats`, `just build-local` — CLI workflows
 
 ## Configuration
 
@@ -230,7 +234,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 
 ### Module Naming
 
-Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple rootDirs act as independent namespaces; first match wins.
+Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple root directories are processed in order and later roots win: if the same module path exists in more than one root, the last root's definition overrides earlier ones.
 
 ### Frontmatter
 
