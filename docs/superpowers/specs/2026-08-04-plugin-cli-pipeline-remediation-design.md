@@ -98,7 +98,7 @@ It is concrete and is emitted with its nested module path preserved. The plugin 
 opencodeConfig.agent["base/core/plan-o-strator"]
 ```
 
-All existing `packages/cli/defaults/agents/base/**` templates remain abstract.
+All other existing `packages/cli/defaults/agents/base/**` templates remain abstract; `base/core/plan-o-strator.md` is the concrete exception.
 
 ### Plugin execution flow
 
@@ -107,6 +107,7 @@ At initialization, the plugin must:
 1. Capture its current working directory and switch to OpenCode's supplied project directory. The current plugin type declares this directory as required; retaining a defensive guard is allowed but must not change the normal contract.
 2. Load the user's cwd-resolved configuration through the CLI package's exported API. This means calling the imported library functions directly; the plugin must not invoke CLI commands, spawn a CLI subprocess, or simulate command-line interactions.
 3. Treat that loaded user configuration as the source of truth. Preserve every loaded project field, including its configured `rootDirs`, all `emitDirs` routes, `storeFile`, `project`, `version`, `maxInheritDepth`, and other settings. If no project config exists, retain the CLI package's normal exported default-config behavior.
+   - The CLI config loader must create independent copies of nested default values before resolving paths. It must not mutate shared `DEFAULT_CONFIG.emitDirs` or `DEFAULT_CONFIG.rootDirs`, so no-config loads from different working directories resolve independently.
 4. Discover every immediate directory under the installed plugin package's `defaults/` directory and prepend those directories to the loaded `rootDirs`. Leave all project roots afterward so project modules override bundled modules with the same module path.
 5. Invoke the CLI package's exported `build()` and `emitAll()` APIs once over the combined roots, using the user's configured `storeFile` and `emitDirs`. Do not create temporary directories, alternate stores, alternate output directories, or temporary CLI processes.
 6. Read the concrete files emitted at the user's configured `emitDirs` locations, then mutate the OpenCode config hook argument's `agent` map with `{ prompt: content }` entries. The hook must mutate the supplied object and must not rely on a return value.
@@ -132,6 +133,8 @@ The plugin must derive an OpenCode agent key from the relative emitted path with
 ```
 
 This intentionally supersedes the earlier flat-directory direction. For this remediation, assume resolved module paths are unique; further collision handling is out of scope.
+
+The plugin's production API remains the declared OpenCode `PluginInput` contract. Testability must be provided through an internal factory or dependency seam; do not add a `defaultsDir` field to `PluginInput` or read undocumented fields from it.
 
 The package's existing defaults-copy mechanisms remain unchanged:
 
@@ -186,6 +189,11 @@ The remediation must add or update automated tests for all of the following:
 9. **No raw fallback loader:** plugin tests demonstrate defaults are processed through CLI-produced outputs, not direct raw Markdown loading.
 10. **Nested output and key preservation:** a nested concrete module emits to a corresponding nested directory and registers under its complete slash-delimited module path, not a flat basename.
 11. **Configuration preservation:** a project config with an additional non-agent `emitDirs` route is retained when the plugin prepends defaults and invokes the shared pipeline.
+12. **No-config isolation:** two no-config loads from different working directories independently resolve `emitDirs.agent` and `emitDirs.skill` beneath their respective cwd; neither load mutates shared defaults used by the other.
+13. **No-config skill routing:** representative concrete skill Markdown emits beneath `<cwd>/.opencode/skills/` and is not injected into OpenCode's `agent` map.
+14. **Post-chdir failure isolation:** a failure after the plugin has entered the OpenCode project directory restores `process.cwd()` and `MD_MERGER_CONFIG` state and returns empty hooks.
+
+Regression fixtures may use representative Markdown modules. The real `base/core/plan-o-strator.md` artifact does not require a dedicated test; its required abstract/concrete, inheritance, nested-path, and injection semantics must be covered by representative fixtures.
 
 ## Validation
 
@@ -206,3 +214,5 @@ All commands must pass. The plugin test suite must prove the required regression
 - Changes to the package `prepublishOnly` script.
 - Adding concrete defaults other than `plan-o-strator`.
 - OpenCode runtime testing against a published npm package; this remediation tests the plugin integration boundary locally.
+- Persistent append-only store growth caused by rebuilding defaults and project roots on each initialization; this is tracked for the planned larger store rework.
+- Collision handling beyond the assumption that resolved module paths are unique.
