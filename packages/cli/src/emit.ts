@@ -82,7 +82,7 @@ export function deduplicateRecords(records: PromptRecord[]): PromptRecord[] {
  * 3. For each module in topological order (skipping abstract):
  *    - Resolve via resolve
  *    - Route to correct dir based on module type
- *    - Write to ${targetDir}/${name}.md (replace / with _ in name)
+ *    - Write to ${targetDir}/${name}.md, preserving nested module path segments
  * 4. If dryRun: print "Would write: {path}" instead of writing
  * 5. Return array of written file paths
  * 6. Error handling: if renderText fails for one module, log to stderr
@@ -150,9 +150,8 @@ export async function emitAll(
       continue;
     }
 
-    // Build output filename: replace / with _
-    const safeName = name.replace(/\//g, "_");
-    const filePath = `${targetDir}/${safeName}.md`;
+    const { join: joinPath } = await import("node:path");
+    const filePath = joinPath(targetDir, `${name}.md`);
 
     // Step 4/5: dryRun or write
     if (dryRun) {

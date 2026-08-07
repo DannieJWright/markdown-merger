@@ -118,7 +118,15 @@ export async function loadConfig(): Promise<Config> {
 
   const config: Config = {
     ...DEFAULT_CONFIG,
+    emitDirs: { ...DEFAULT_CONFIG.emitDirs },
+    rootDirs: [...DEFAULT_CONFIG.rootDirs],
     ...parsed,
+    emitDirs: parsed.emitDirs && typeof parsed.emitDirs === "object"
+      ? { ...(parsed.emitDirs as Record<string, string>) }
+      : { ...DEFAULT_CONFIG.emitDirs },
+    rootDirs: Array.isArray(parsed.rootDirs)
+      ? [...(parsed.rootDirs as string[])]
+      : [...DEFAULT_CONFIG.rootDirs],
   } as Config;
 
   if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);

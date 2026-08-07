@@ -2,6 +2,7 @@ import { describe, test, expect, spyOn } from "bun:test";
 import { getConfigPath, loadConfig } from "@md-merger/config";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { DEFAULT_CONFIG } from "../../src/types";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 describe("getConfigPath", () => {
@@ -60,6 +61,30 @@ describe("loadConfig", () => {
 });
 
 describe("loadConfig emitDirs", () => {
+  test("no-config loads resolve independent cwd routes without mutating shared defaults", async () => {
+    const originalCwd = process.cwd();
+    const originalConfig = process.env.MD_MERGER_CONFIG;
+    const rootA = join(baseTempDir, "no-config-a-" + Math.random().toString(36).slice(2));
+    const rootB = join(baseTempDir, "no-config-b-" + Math.random().toString(36).slice(2));
+    mkdirSync(join(rootA, ".md-merger", "agents-root", "input"), { recursive: true });
+    mkdirSync(join(rootB, ".md-merger", "agents-root", "input"), { recursive: true });
+    delete process.env.MD_MERGER_CONFIG;
+    try {
+      process.chdir(rootA); const configA = await loadConfig();
+      process.chdir(rootB); const configB = await loadConfig();
+      expect(configA.emitDirs.agent).toBe(join(rootA, ".opencode", "agents"));
+      expect(configA.emitDirs.skill).toBe(join(rootA, ".opencode", "skills"));
+      expect(configB.emitDirs.agent).toBe(join(rootB, ".opencode", "agents"));
+      expect(configB.emitDirs.skill).toBe(join(rootB, ".opencode", "skills"));
+      expect(DEFAULT_CONFIG.emitDirs.agent).toBe(".opencode/agents");
+      expect(DEFAULT_CONFIG.emitDirs.skill).toBe(".opencode/skills");
+      expect(DEFAULT_CONFIG.rootDirs).toEqual([".md-merger/agents-root/input"]);
+    } finally {
+      process.chdir(originalCwd);
+      if (originalConfig === undefined) delete process.env.MD_MERGER_CONFIG; else process.env.MD_MERGER_CONFIG = originalConfig;
+      rmSync(rootA, { recursive: true, force: true }); rmSync(rootB, { recursive: true, force: true });
+    }
+  });
   test("emitDirs defaults to { default: 'output' }", async () => {
     const tmpDir = join(baseTempDir, "evo-emitdirs-default-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "cfg.yaml");

@@ -91,7 +91,7 @@ describe("build", () => {
     expect(record?.sections[0]?.body).toBe("Updated body.");
   });
 
-  test("first root dir wins when same module name exists in multiple roots", async () => {
+  test("last root dir wins when same module name exists in multiple roots", async () => {
     const rootA = join(rootDir, "a");
     const rootB = join(rootDir, "b");
     mkdirSync(rootA, { recursive: true });
@@ -104,6 +104,7 @@ describe("build", () => {
 
     const record = await findLatest(storePath, "base");
     expect(record).toBeDefined();
-    expect(record!.frontmatter).toHaveProperty("name", "BaseA");
+    expect(record!.frontmatter).toHaveProperty("name", "BaseB");
+    expect(record!.sections[0]?.body).toBe("Role from B.");
   });
 });

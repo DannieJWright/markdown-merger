@@ -1,9 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { mkdirSync, rmSync, readFileSync } from "node:fs";
+import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emitAll, renderText } from "@md-merger/emit";
 import { updateOrCreate, findLatest } from "@md-merger/store";
 import type { Config } from "@md-merger/types";
+import { build } from "../../src/import";
+import { DEFAULT_CONFIG } from "../../src/types";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 const testDir = join(baseTempDir, "evo-test-emit-" + Math.random().toString(36).slice(2));
@@ -157,6 +159,25 @@ describe("renderText", () => {
 });
 
 describe("emitAll", () => {
+  test("emits nested module paths under the type route and skips abstract modules", async () => {
+    const inputRoot = join(testDir, "input");
+    const outputRoot = join(testDir, "out-nested");
+    mkdirSync(join(inputRoot, "base", "core"), { recursive: true });
+    writeFileSync(join(inputRoot, "base", "BasePrimaryAgent.md"), "---\ntype: agent\nabstract: true\n---\n## Role\nBase primary content.");
+    writeFileSync(join(inputRoot, "base", "core", "plan-o-strator.md"), "---\ntype: agent\nextends: [base/BasePrimaryAgent]\nabstract: false\n---\n## Role\nConcrete orchestration content.");
+    await build([inputRoot], storePath, "test-project");
+    const config: Config = { project: "test-project", version: "1", maxInheritDepth: 5, storeFile: storePath, emitDirs: { agent: outputRoot }, rootDirs: [inputRoot] };
+    const written = await emitAll(storePath, config.emitDirs, config, false);
+    expect(written).toContain(join(outputRoot, "base", "core", "plan-o-strator.md"));
+    expect(written.some((p) => p.includes("BasePrimaryAgent"))).toBe(false);
+    expect(existsSync(join(outputRoot, "base", "core", "plan-o-strator.md"))).toBe(true);
+    expect(existsSync(join(outputRoot, "base_core_plan-o-strator.md"))).toBe(false);
+  });
+
+  test("default config routes agent and skill types to .opencode directories", () => {
+    expect(DEFAULT_CONFIG.emitDirs.agent).toBe(".opencode/agents");
+    expect(DEFAULT_CONFIG.emitDirs.skill).toBe(".opencode/skills");
+  });
   test("writes merged markdown files", async () => {
     await updateOrCreate(storePath, "base", "test", {
       sections: [{ name: "role", body: "You are helpful." }],

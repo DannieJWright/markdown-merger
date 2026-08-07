@@ -24,17 +24,13 @@ async function globMd(dir: string): Promise<string[]> {
 /**
  * Glob `.md` files from each rootDir, parse them, and write records to the JSONL store.
  *
- * Multiple root dirs act as independent namespaces; first match wins.
- * If a module name computed from rootDir-B already exists in the store from rootDir-A,
- * skip importing from rootDir-B.
+ * Root dirs are processed in order and later roots win.
  */
 export async function build(
   rootDirs: string[],
   storePath: string,
   project: string,
 ): Promise<void> {
-  const seen = new Set<string>();
-
   for (const rootDir of rootDirs) {
     const files = await globMd(rootDir);
 
@@ -42,10 +38,6 @@ export async function build(
       const modulePath = relative(rootDir, filepath)
         .replace(/\.md$/, "")
         .replace(/\\/g, "/");
-
-      // First match wins — skip if already seen in this build
-      if (seen.has(modulePath)) continue;
-      seen.add(modulePath);
 
       const content = await readFile(filepath, "utf-8");
       const { metadata, body } = extractFrontmatter(content);

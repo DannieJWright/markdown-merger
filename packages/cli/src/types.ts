@@ -39,6 +39,6 @@ export const DEFAULT_MAX_INHERIT_DEPTH = 5;
 export const DEFAULT_CONFIG: Omit<Config, "project" | "version"> = {
   maxInheritDepth: DEFAULT_MAX_INHERIT_DEPTH,
   storeFile: "prompts.jsonl",
-  emitDirs: { default: "output" },
+  emitDirs: { default: "output", agent: ".opencode/agents", skill: ".opencode/skills" },
   rootDirs: [".md-merger/agents-root/input"],
 };
