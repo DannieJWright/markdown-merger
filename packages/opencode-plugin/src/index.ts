@@ -1,5 +1,5 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { loadConfig, build, emitAll } from "@md-merger/cli";
+import { loadConfig, build, emitAllWithMetadata } from "@md-merger/cli";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join, dirname, isAbsolute, relative, resolve, sep } from "node:path";
@@ -30,15 +30,16 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
       const config = await loadConfig();
       const rootDirs = [...await discoverDefaultRoots(defaultsDir), ...config.rootDirs];
       await build(rootDirs, config.storeFile, config.project);
-      const emittedPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
+      const emittedFiles = await emitAllWithMetadata(config.storeFile, config.emitDirs, config, false);
       const agentPrompts = new Map<string, string>();
       if (config.emitDirs.agent !== undefined) {
         const agentRoot = resolve(config.emitDirs.agent);
-        for (const emittedPath of emittedPaths) {
-          const key = toAgentKey(agentRoot, resolve(emittedPath));
+        for (const emittedFile of emittedFiles) {
+          if (emittedFile.type !== "agent") continue;
+          const key = toAgentKey(agentRoot, resolve(emittedFile.path));
           if (key === undefined) continue;
-          try { agentPrompts.set(key, await readFile(resolve(emittedPath), "utf-8")); }
-          catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedPath}`); }
+          try { agentPrompts.set(key, await readFile(resolve(emittedFile.path), "utf-8")); }
+          catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedFile.path}`); }
         }
       }
       return { config: async (opencodeConfig: Record<string, unknown>) => {

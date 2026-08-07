@@ -88,12 +88,14 @@ export function deduplicateRecords(records: PromptRecord[]): PromptRecord[] {
  * 6. Error handling: if renderText fails for one module, log to stderr
  *    but continue processing remaining modules
  */
-export async function emitAll(
+export interface EmittedFile { path: string; type: string; }
+
+export async function emitAllWithMetadata(
   storePath: string,
   emitDirs: Record<string, string>,
   config: Config,
   dryRun: boolean = false,
-): Promise<string[]> {
+): Promise<EmittedFile[]> {
   // Step 1: Read all records and deduplicate
   const records = await readStore(storePath);
   const dedupedRecords = deduplicateRecords(records);
@@ -118,7 +120,7 @@ export async function emitAll(
   }
 
   // Step 3: Process in topological order, skipping abstract modules
-  const writtenPaths: string[] = [];
+  const writtenPaths: EmittedFile[] = [];
   const failedModules: string[] = [];
 
   for (const name of sortedNames) {
@@ -156,7 +158,7 @@ export async function emitAll(
     // Step 4/5: dryRun or write
     if (dryRun) {
       console.log(`Would write: ${filePath}`);
-      writtenPaths.push(filePath);
+      writtenPaths.push({ path: filePath, type: record.type });
     } else {
       // Create parent directories if needed
       const { mkdirSync } = await import("node:fs");
@@ -165,7 +167,7 @@ export async function emitAll(
 
       const { writeFileSync } = await import("node:fs");
       writeFileSync(filePath, text, "utf-8");
-      writtenPaths.push(filePath);
+      writtenPaths.push({ path: filePath, type: record.type });
     }
   }
 
@@ -177,4 +179,8 @@ export async function emitAll(
   }
 
   return writtenPaths;
+}
+
+export async function emitAll(storePath: string, emitDirs: Record<string, string>, config: Config, dryRun = false): Promise<string[]> {
+  return (await emitAllWithMetadata(storePath, emitDirs, config, dryRun)).map((file) => file.path);
 }
