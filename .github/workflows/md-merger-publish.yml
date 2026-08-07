@@ -1,0 +1,31 @@
+name: Publish @md-merger/cli to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+        # Runs at workspace root for workspace resolution — do NOT set working-directory
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run bundle
+        working-directory: packages/cli
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm publish --provenance --access public
+        working-directory: packages/cli

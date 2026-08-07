@@ -1,6 +1,6 @@
 # md-merger
 
-Markdown-based AI agent/skill prompt management with inheritance. Flat 9-module source with a 4-stage core pipeline: **import → store → resolve → emit**. Supporting modules (`config`, `frontmatter`, `cli`, `types`, `index`) handle configuration, parsing, dispatch, and shared definitions. Zero npm dependencies.
+Markdown-based AI agent/skill prompt management with inheritance. Bun workspace monorepo with `packages/cli/` (9-module CLI) and `packages/opencode-plugin/` (OpenCode plugin). 4-stage core pipeline: **import → store → resolve → emit**. Supporting modules (`config`, `frontmatter`, `cli`, `types`, `index`) handle configuration, parsing, dispatch, and shared definitions. Zero npm dependencies.
 
 ## Overview
 
@@ -46,7 +46,7 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 | Runtime | Bun (native execution, no bundler/transpiler) |
 | Build | `tsc --noEmit` (type-checking only, no emission) |
 | Task Runner | Just (`Justfile` wraps `bun` commands) |
-| Testing | \`bun:test\` (104 tests across 8 files) |
+| Testing | \`bun:test\` (124 tests across 10 files) |
 | Dependencies | **Zero** — all parsing (including YAML) is hand-rolled. Only Node.js built-ins + Bun runtime APIs |
 | License | MIT (plus MIT-licensed adapted code from Canopy) |
 
@@ -55,9 +55,25 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 ### Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.0
-- [Just](https://just.systems/) (optional — `bun run` scripts in `package.json` work too)
+- [Just](https://just.systems/) (optional — root scripts are limited to `bun test` and `bun run typecheck`)
 
 ### Installation
+
+#### npm (CLI + Library)
+
+```bash
+npm install -g @md-merger/cli
+```
+
+#### OpenCode Plugin
+
+Add to your `opencode.json`:
+
+```json
+{ "plugin": ["@md-merger/opencode-plugin"] }
+```
+
+#### Local Development
 
 ```bash
 git clone https://github.com/your-org/md-merger.git
@@ -111,6 +127,24 @@ just emit
 # Output: output/agents/coder.md (merged output with system/base sections + coder overrides)
 ```
 
+## Usage
+
+### CLI
+
+```bash
+md-merger emit
+md-merger build
+md-merger render
+```
+
+### OpenCode Plugin
+
+When loaded as an OpenCode plugin, md-merger automatically:
+
+1. Reads your config from `$MD_MERGER_CONFIG` or `.md-merger/config.yaml`
+2. Resolves agent/skill inheritance
+3. Registers merged agents with OpenCode's runtime
+
 ## CLI Reference
 
 | Command | Description |
@@ -126,11 +160,27 @@ just emit
 
 **Planned (stubbed):** `config set` and `config unset` — commands exist but only print a warning and exit. Use `$MD_MERGER_CONFIG` env var for configuration overrides until implemented.
 
-Equivalent `just` commands exist for most of the above (`just build`, `just emit`, `just render <module>`, `just stats`, `just doctor`, etc.). Note: `config` subcommands are only available via direct CLI invocation (e.g. `bun ./src/index.ts config show`).
+Verified commands:
 
-Equivalent `bun run` scripts exist in `package.json` (`bun run build`, `bun run emit`, etc.) for the same subset of commands. Note: `bun run render <module>` requires a module argument.
+- `bun test` — run the full workspace test suite
+- `bun run typecheck` — run `tsc --noEmit` across the workspace
+- `bun test --cwd packages/cli` — run CLI package tests
+- `bun test --cwd packages/opencode-plugin` — run plugin package tests
+- `just build`, `just emit`, `just render`, `just doctor`, `just stats`, `just build-local` — CLI workflows
 
 ## Configuration
+
+Place a `config.yaml` at `.md-merger/config.yaml` or set the `$MD_MERGER_CONFIG` environment variable:
+
+```yaml
+project: my-project
+version: "1"
+rootDirs:
+  - .md-merger/agents-root/input
+emitDirs:
+  agent: output/agents
+  skill: output/skills
+```
 
 ### Config File
 
@@ -175,7 +225,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 {
   maxInheritDepth: 5,
   storeFile: "prompts.jsonl",
-  emitDirs: { default: "output" },
+  emitDirs: { default: "output", agent: ".opencode/agents", skill: ".opencode/skills" },
   rootDirs: [".md-merger/agents-root/input"],
 }
 ```
@@ -184,7 +234,7 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 
 ### Module Naming
 
-Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple rootDirs act as independent namespaces; first match wins.
+Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple root directories are processed in order and later roots win: if the same module path exists in more than one root, the last root's definition overrides earlier ones.
 
 ### Frontmatter
 
@@ -254,26 +304,29 @@ Sections are parsed by heading level (`##` = level 1, `###` = level 2, etc.). He
 
 ```
 md-merger/
-├── src/                    # Application source (9 modules)
-│   ├── index.ts            # CLI entry point
-│   ├── cli.ts              # Command dispatcher
-│   ├── config.ts           # Config loading + YAML parser
-│   ├── import.ts           # Markdown import pipeline
-│   ├── frontmatter.ts      # Frontmatter extraction + section parsing
-│   ├── store.ts            # JSONL store operations
-│   ├── resolve.ts          # Inheritance resolution + topological sort
-│   ├── emit.ts             # Output generation
-│   └── types.ts            # Shared interfaces + defaults
-├── tests/
-│   ├── unit/               # Unit tests per module
-│   ├── e2e/                # End-to-end pipeline test
-│   ├── resources/          # Test fixtures
-│   └── build/              # Test build artifacts (gitignored)
+├── packages/
+│   ├── cli/                # CLI application source + tests
+│   │   ├── src/            # Application source (9 modules)
+│   │   │   ├── index.ts    # CLI entry point
+│   │   │   ├── cli.ts      # Command dispatcher
+│   │   │   ├── config.ts   # Config loading + YAML parser
+│   │   │   ├── import.ts   # Markdown import pipeline
+│   │   │   ├── frontmatter.ts  # Frontmatter extraction + section parsing
+│   │   │   ├── store.ts    # JSONL store operations
+│   │   │   ├── resolve.ts  # Inheritance resolution + topological sort
+│   │   │   ├── emit.ts     # Output generation
+│   │   │   └── types.ts    # Shared interfaces + defaults
+│   │   ├── defaults/       # Bundled default prompts
+│   │   └── tests/
+│   │       ├── unit/       # Unit tests per module
+│   │       ├── e2e/        # End-to-end pipeline test
+│   │       ├── resources/  # Test fixtures
+│   │       └── build/      # Test build artifacts (gitignored)
+│   └── opencode-plugin/    # OpenCode AI plugin
 ├── docs/                   # AI agent orchestration system prompt
-├── .md-merger/                   # Runtime config + input files (gitignored)
-├── bunfig.toml             # Disables peer-dependency installation (cosmetic with zero deps)
-├── Justfile                # Task runner
-├── package.json            # Scripts + metadata
+├── .md-merger/             # Runtime config + input files (gitignored)
+├── bunfig.toml             # Bun workspace config
+├── package.json            # Workspace scripts + metadata
 ├── tsconfig.json           # TypeScript config
 └── LICENSE                 # MIT
 ```
@@ -286,9 +339,6 @@ just typecheck
 
 # Run tests
 just test
-
-# Quick dev cycle: watch mode
-bun run dev
 
 # Build
 just build
@@ -304,9 +354,9 @@ just doctor
 
 ### Test Structure
 
-- `tests/unit/` — Unit tests for each module (frontmatter, store, resolve, import, emit, config, cli)
-- `tests/e2e/` — Full pipeline test: build → emit → diff against expected output
-- `tests/resources/` — Test fixtures: sample input `.md` files, expected output, test config
+- `packages/cli/tests/unit/` — Unit tests for each module (frontmatter, store, resolve, import, emit, config, cli)
+- `packages/cli/tests/e2e/` — Full pipeline test: build → emit → diff against expected output
+- `packages/cli/tests/resources/` — Test fixtures: sample input `.md` files, expected output, test config
 
 ### Running Tests
 
@@ -334,7 +384,7 @@ describe("feature", () => {
 
 - Use `@md-merger/*` path aliases (configured in `tsconfig.json`)
 - For tests that need store/config: use `beforeEach`/`afterEach` to set `MD_MERGER_CONFIG` env var and clean up build directories
-- See `tests/e2e/e2e.test.ts` for pattern of environment sandboxing
+- See `packages/cli/tests/e2e/e2e.test.ts` for pattern of environment sandboxing
 
 ### Test Constraints (marked in test code)
 
@@ -351,7 +401,7 @@ Tests use constraint tags inline as comments (currently present in the E2E test 
 - **Naming**: `camelCase` for functions/variables, `PascalCase` for interfaces/types
 - **TypeScript**: strict mode, `noUncheckedIndexedAccess`, ESNext target/module
 - **Dependencies**: zero npm dependencies. All parsing (YAML, markdown sections) is hand-rolled
-- **Path aliases**: `@md-merger/*` maps to `./src/*` (configured in `tsconfig.json`)
+- **Path aliases**: `@md-merger/*` maps to `./packages/cli/src/*` (configured in `tsconfig.json`)
 - **Git**: Conventional Commits pattern. PR-linked commits use `(#N)` suffix
 
 ### Dependency Philosophy
@@ -377,22 +427,22 @@ If you need to add a dependency, justify it against these constraints.
 
 | Question | Answer |
 |----------|--------|
-| How to run the CLI? | `bun ./src/index.ts <command>` or `just <command>` |
+| How to run the CLI? | `bun ./packages/cli/src/index.ts <command>` or `just <command>` |
 | How to run tests? | `bun test` |
-| Entry point? | `src/index.ts` → `src/cli.ts` |
+| Entry point? | `packages/cli/src/index.ts` → `packages/cli/src/cli.ts` |
 | How does a module get its name? | Relative path from `rootDir`, e.g. `agents/coder` from `agents/coder.md` |
 | Where is the store? | Configured in `storeFile`, defaults to `prompts.jsonl`. Append-only JSONL. |
 | How does inheritance work? | Recursive resolution with deep-clone section merge. See `resolve.ts` `resolve()` function. |
 | How to add a new CLI command? | Add a `case` in `cli.ts` → `run()` switch statement. |
 | Can I add npm dependencies? | No — project philosophy is zero dependencies. Justify if necessary. |
-| How to test a new module? | Add `tests/unit/<module>.test.ts` using `bun:test` API |
+| How to test a new module? | Add `packages/cli/tests/unit/<module>.test.ts` using `bun:test` API |
 
 ### Working Pattern
 
 1. Use `@md-merger/*` imports for module references in tests (path alias from `tsconfig.json`)
 2. Tests should sandbox `MD_MERGER_CONFIG` in `beforeEach`/`afterEach` if they touch the store
 3. Run `just typecheck && just test` after writing code to verify
-4. For store-dependent tests, use a temporary build dir under `tests/build/`
+4. For store-dependent tests, use a temporary build dir under `packages/cli/tests/build/`
 5. Use `process.chdir()` carefully — config resolution depends on `process.cwd()` (see C2 constraint tag in e2e tests)
 
 ### Key Constraints

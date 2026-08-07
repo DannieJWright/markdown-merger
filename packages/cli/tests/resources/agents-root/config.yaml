@@ -1,0 +1,12 @@
+# NOTE: All paths below are relative to the repo root (process.cwd()).
+# This config must be used with CWD set to the repository root,
+# which is how the e2e tests run it (workingDir: repoRoot).
+project: md-merger
+version: "1"
+maxInheritDepth: 5
+storeFile: packages/cli/tests/build/prompts.jsonl
+emitDirs:
+  agent: packages/cli/tests/build/agents-root/output/agents
+  skill: packages/cli/tests/build/agents-root/output/skills
+rootDirs:
+  - packages/cli/tests/resources/agents-root/input

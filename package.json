@@ -1,17 +1,13 @@
 {
-  "name": "md-merger",
-  "version": "0.1.0",
-  "type": "module",
-  "bin": {
-    "md-merger": "./src/index.ts"
+  "name": "@md-merger/monorepo",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "bun-types": "^1.3.14",
+    "typescript": "^5.9.2"
   },
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
-    "build": "bun src/index.ts build",
-    "emit": "bun src/index.ts emit",
-    "render": "bun src/index.ts render",
-    "stats": "bun src/index.ts stats",
-    "doctor": "bun src/index.ts doctor",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   }

@@ -1,0 +1,42 @@
+name: Publish opencode-plugin to npm
+
+on:
+  workflow_run:
+    workflows: ["Publish @md-merger/cli to npm"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-plugin:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+        # Runs at workspace root for workspace resolution — do NOT set working-directory
+      - run: bun run typecheck
+      - run: bun test
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Get latest @md-merger/cli version from npm
+        id: version
+        run: echo "VERSION=$(npm view @md-merger/cli dist-tags.latest)" >> $GITHUB_OUTPUT
+      - name: Replace workspace:* with semver for npm publish
+        working-directory: packages/opencode-plugin
+        env:
+          MD_MERGER_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          node -e "const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+          p.dependencies['@md-merger/cli'] = '^' + process.env.MD_MERGER_VERSION;
+          require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');"
+      - run: npm publish --provenance --access public
+        working-directory: packages/opencode-plugin
