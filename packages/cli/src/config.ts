@@ -118,8 +118,6 @@ export async function loadConfig(): Promise<Config> {
 
   const config: Config = {
     ...DEFAULT_CONFIG,
-    emitDirs: { ...DEFAULT_CONFIG.emitDirs },
-    rootDirs: [...DEFAULT_CONFIG.rootDirs],
     ...parsed,
     emitDirs: parsed.emitDirs && typeof parsed.emitDirs === "object"
       ? { ...(parsed.emitDirs as Record<string, string>) }

@@ -89,10 +89,10 @@ describe("E2E: agents-root", () => {
     for (const filePath of expectedFiles) {
       const expectedPath = resolve(expectedOutputDir, filePath);
       // W3: Use actual emitDirs from config to determine generated file location
-      const fileName = filePath.split("/").pop();
+      const relativePath = filePath.replace(/\\/g, "/").split("/").slice(1).join("/");
       let generatedPath: string | null = null;
       for (const targetDir of Object.values(emitDirs)) {
-        const candidate = resolve(targetDir, fileName!);
+        const candidate = resolve(targetDir, relativePath);
         if (existsSync(candidate)) {
           generatedPath = candidate;
           break;
@@ -101,7 +101,7 @@ describe("E2E: agents-root", () => {
 
       expect(
         generatedPath !== null,
-        `Generated file missing. Expected in one of emitDirs: ${JSON.stringify(emitDirs)}; looked for ${fileName}`
+        `Generated file missing. Expected in one of emitDirs: ${JSON.stringify(emitDirs)}; looked for ${relativePath}`
       ).toBe(true);
 
       const expectedContent = readFileSync(expectedPath, "utf-8");
