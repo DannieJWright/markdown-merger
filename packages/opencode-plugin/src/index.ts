@@ -1,88 +1,57 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { loadConfig, build, emitAll } from "@md-merger/cli";
-import type { Config } from "@md-merger/cli";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { join, dirname, relative, sep } from "node:path";
+import { join, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Defaults are bundled in the plugin package via prepublishOnly (copies ../cli/defaults/ to ./defaults/)
-const defaultsDir = join(__dirname, "..", "defaults", "agents");
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const packageDefaultsDir = join(moduleDir, "..", "defaults");
 
-export async function loadBundledDefaults(root = defaultsDir): Promise<Map<string, string>> {
-  const defaults = new Map<string, string>();
-  if (!existsSync(root)) return defaults;
-  // Preserve the normalized path under defaults/agents so nested names cannot collide.
-  const entries = await readdir(root, { recursive: true, withFileTypes: true });
-  entries.sort((a, b) => {
-    const aPath = join(a.parentPath, a.name);
-    const bPath = join(b.parentPath, b.name);
-    return aPath.localeCompare(bPath);
-  });
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-    const entryPath = join(entry.parentPath, entry.name);
-    const agentName = relative(root, entryPath).split(sep).join("/").replace(/\.md$/, "");
-    try {
-      const content = await readFile(entryPath, "utf-8");
-      defaults.set(agentName, content);
-    } catch {
-      console.warn(`[md-merger] Failed to read bundled default: ${entryPath}`);
-    }
-  }
-  return defaults;
+export async function discoverDefaultRoots(defaultsDir: string): Promise<string[]> {
+  if (!existsSync(defaultsDir)) return [];
+  const entries = await readdir(defaultsDir, { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory())
+    .map((entry) => join(defaultsDir, entry.name))
+    .sort((a, b) => a.localeCompare(b));
 }
 
-export const mdMergerPlugin: Plugin = async (_input: PluginInput) => {
-  const previousCwd = process.cwd();
-  try {
-    const bundledDefaults = await loadBundledDefaults();
-    if (_input.directory) process.chdir(_input.directory);
-    const config = await loadConfig();
-    await build(config.rootDirs, config.storeFile, config.project);
-    const writtenPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
+function toAgentKey(agentRoot: string, emittedPath: string): string | undefined {
+  const relativePath = relative(agentRoot, emittedPath);
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) return undefined;
+  return relativePath.split(sep).join("/").replace(/\.md$/, "");
+}
 
-    if (writtenPaths.length === 0 && bundledDefaults.size > 0) {
-      console.log("[md-merger] No config found — bundled defaults available from defaults/agents/");
-    }
-
-    const agentHooks = {
-      config: async (opencodeConfig: Record<string, unknown>) => {
-        if (writtenPaths.length > 0) {
-          // Read emitted agent files and inject into OpenCode config
-          if (opencodeConfig.agent === undefined) {
-            opencodeConfig.agent = {};
-          }
-          const agentConfig = opencodeConfig.agent as Record<string, unknown>;
-          for (const path of writtenPaths) {
-            try {
-              const content = await readFile(path, "utf-8");
-              const agentName = path.replace(/\.md$/, "").replace(/.*[/\\]/, "");
-              agentConfig[agentName] = { prompt: content };
-            } catch {
-              console.warn(`[md-merger] Failed to read emitted agent: ${path}`);
-            }
-          }
-        } else {
-          console.log("[md-merger] No emitted agents found, using bundled defaults");
-          // Inject bundled defaults directly into OpenCode config
-          if (opencodeConfig.agent === undefined) {
-            opencodeConfig.agent = {};
-          }
-          const agentConfig = opencodeConfig.agent as Record<string, unknown>;
-          for (const [name, content] of bundledDefaults) {
-            agentConfig[name] = { prompt: content };
-          }
+export function createMdMergerPlugin(defaultsDir: string): Plugin {
+  return async (input: PluginInput) => {
+    const previousCwd = process.cwd();
+    try {
+      if (input.directory) process.chdir(input.directory);
+      const config = await loadConfig();
+      const rootDirs = [...await discoverDefaultRoots(defaultsDir), ...config.rootDirs];
+      await build(rootDirs, config.storeFile, config.project);
+      const emittedPaths = await emitAll(config.storeFile, config.emitDirs, config, false);
+      const agentPrompts = new Map<string, string>();
+      if (config.emitDirs.agent !== undefined) {
+        const agentRoot = resolve(config.emitDirs.agent);
+        for (const emittedPath of emittedPaths) {
+          const key = toAgentKey(agentRoot, resolve(emittedPath));
+          if (key === undefined) continue;
+          try { agentPrompts.set(key, await readFile(resolve(emittedPath), "utf-8")); }
+          catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedPath}`); }
         }
-      },
-    };
+      }
+      return { config: async (opencodeConfig: Record<string, unknown>) => {
+        if (agentPrompts.size === 0) return;
+        if (opencodeConfig.agent === undefined) opencodeConfig.agent = {};
+        const agents = opencodeConfig.agent as Record<string, unknown>;
+        for (const [key, prompt] of agentPrompts) agents[key] = { prompt };
+      } };
+    } catch (err) {
+      console.error("[md-merger] Plugin initialization failed:", err);
+      return {};
+    } finally { process.chdir(previousCwd); }
+  };
+}
 
-    return agentHooks;
-  } catch (err) {
-    console.error("[md-merger] Plugin initialization failed:", err);
-    return {};
-  } finally {
-    process.chdir(previousCwd);
-  }
-};
+export const mdMergerPlugin: Plugin = createMdMergerPlugin(packageDefaultsDir);
