@@ -145,6 +145,31 @@ describe.serial("plugin initialization", () => {
     try { const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any); expect(hooks).toEqual({}); expect(process.cwd()).toBe(cwd); expect(process.env.MD_MERGER_CONFIG).toBe(configPath); }
     finally { process.chdir(cwd); if (before === undefined) delete process.env.MD_MERGER_CONFIG; else process.env.MD_MERGER_CONFIG = before; rmSync(root, { recursive: true, force: true }); }
   });
+
+  it("does not inject skills emitted beneath the agent route", async () => {
+    const root = join(import.meta.dirname, "build", `overlap-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults");
+    const source = join(root, "source");
+    const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true });
+    mkdirSync(source, { recursive: true });
+    writeFileSync(join(source, "worker.md"), "---\ntype: agent\nabstract: false\n---\n## Role\nWorker.");
+    writeFileSync(join(source, "helper.md"), "---\ntype: skill\nabstract: false\n---\n## Role\nHelper.");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\n  skill: ${join(out, "skills")}\nrootDirs:\n  - ${source}\n`);
+    process.env.MD_MERGER_CONFIG = join(root, ".md-merger", "config.yaml");
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
+      const opencodeConfig: Record<string, unknown> = {};
+      await (hooks as any).config(opencodeConfig);
+      expect(existsSync(join(out, "worker.md"))).toBe(true);
+      expect(existsSync(join(out, "skills", "helper.md"))).toBe(true);
+      expect((opencodeConfig.agent as any).worker.prompt).toContain("Worker.");
+      expect((opencodeConfig.agent as any)["skills/helper"]).toBeUndefined();
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 const originalCwd = process.cwd();
