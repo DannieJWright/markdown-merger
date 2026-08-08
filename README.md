@@ -27,14 +27,14 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 | `config.ts` | Hand-rolled YAML parser for `.md-merger/config.yaml`, default config resolution |
 | `import.ts` | Recursively glob `.md` files from `rootDirs`, parse, write records to JSONL store |
 | `frontmatter.ts` | YAML frontmatter extraction, hierarchical section parsing (arbitrary nesting depth), markdown rendering |
-| `store.ts` | Append-only JSONL store — `readStore`, `appendRecord`, `findLatest`, `updateOrCreate` |
+| `store.ts` | Transactional JSONL snapshot store — `readStore`, snapshot replacement, `findLatest` |
 | `resolve.ts` | Recursive inheritance resolution with cycle detection, topological sort (Kahn's algorithm), deep-clone section merging |
 | `emit.ts` | Resolve all modules in topological order, route by `type`, write output `.md` files |
 | `types.ts` | Shared interfaces: `Section`, `PromptRecord`, `Config`, `RenderResult` |
 
 ### Data Flow
 
-1. **Build phase**: `import.ts` reads all `.md` files from configured `rootDirs`, parses frontmatter and sections via `frontmatter.ts`, writes versioned records to the append-only JSONL store via `store.ts`.
+1. **Build phase**: `import.ts` reads all `.md` files from configured `rootDirs`, parses frontmatter and sections via `frontmatter.ts`, and transactionally replaces the current-root JSONL snapshot via `store.ts`.
 2. **Emit phase**: `emit.ts` reads all records, topologically sorts them (Kahn's algorithm), resolves each leaf module's full inheritance chain via `resolve.ts`, merges sections deep-clone-style (child overrides parent by name+level), renders to markdown, and writes output files routed by `type`.
 3. **Render (ad-hoc)**: `render <module>` resolves a single module's full inheritance and prints merged markdown — useful for previewing without running emit.
 
@@ -236,6 +236,24 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 
 Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple root directories are processed in order and later roots win: if the same module path exists in more than one root, the last root's definition overrides earlier ones.
 
+#### Root Exports
+
+A root may optionally contain a fixed top-level file named `md-merger-root.yaml` to publish aliases for bare inheritance references. Targets belong to that same root. For example:
+
+```yaml
+exports:
+  orchestrator: base/orchestrator.md
+  base-orchestrator: base/base-orchestrator
+```
+
+This manifest is a deliberately restricted YAML subset, not general YAML. It accepts blank lines, full-line comments, and LF or CRLF line endings, with exactly one unindented `exports:` key followed by exactly two-space-indented, unquoted scalar entries. The mapping may be empty. Quoted scalars, inline comments or maps, nested values, list entries, extra or repeated top-level keys, indented top-level keys, and other indentation widths are rejected. Export aliases are non-empty bare names; targets are normalized same-root Markdown module paths.
+
+Every root manifest is loaded and validated before any build records are written. Valid exports are combined in root order, so a later root replaces an earlier root's alias. Invalid manifests abort the build before records are written.
+
+The OpenCode plugin also uses the final export map as its public agent-name registry. A concrete `type: agent` module targeted by one or more active aliases is injected under each alias instead of its canonical module path. Canonical plugin keys are suppressed for every target named by any root manifest, including targets superseded when a later root replaces an alias; only the later alias target is exposed under that alias. An unexported concrete agent keeps its path-derived name. This affects only OpenCode agent keys; module names, inheritance, store records, and emitted paths remain canonical.
+
+Alias ownership belongs only to the final later-root-wins root-export map; `extends` never transfers alias ownership. For example: (1) if a project replaces the bundled `base/core/plan-o-strator` at the same path, OpenCode injects only `plan-o-strator` with the project replacement; (2) if a project adds `base/plan-o-strator` extending the bundled target without exporting it, OpenCode injects both `plan-o-strator` for the bundled target and `base/plan-o-strator` for the merged child; (3) if that project also exports `plan-o-strator: base/plan-o-strator`, OpenCode injects only `plan-o-strator` with the merged child content. All manifest targets, including superseded targets, keep their canonical plugin keys suppressed.
+
 ### Frontmatter
 
 Each `.md` file supports YAML frontmatter:
@@ -248,13 +266,15 @@ abstract: true                           # Exclude from emit output
 ---
 ```
 
-- `extends` — list of parent module names. Processed left-to-right; later parents override earlier ones.
+- `extends` — list of parent references. References are resolved in this order: (1) path separators are normalized and an optional `.md` suffix is removed; (2) slash-qualified references are exact module paths and bypass exports; (3) bare names consult the combined export registry, where later roots win; (4) an unexported bare name falls back to an exact root-level module name. Processed left-to-right; later parents override earlier ones.
 - `type` — used as key into `emitDirs` for output routing. Modules without `type` are skipped during emit.
 - `abstract` — modules marked abstract are included in inheritance resolution but excluded from emit output.
 
+For example, the concrete `base/orchestrator` can extend the bare `base-orchestrator`. A project root can override that alias to `user/base-orchestrator`, while the project module extends the exact `base/base-orchestrator` path. That override chain injects the project `Subrole` without changing the exact default inheritance, so the resolved output preserves the default `Role` and adds `Subrole`. Exact references remain stable even when a later root replaces an alias.
+
 ### JSONL Store
 
-The store (`prompts.jsonl` by default) is an append-only JSONL file. Each line is a `PromptRecord`:
+The store (`prompts.jsonl` by default) is a JSONL snapshot. Each line is a `PromptRecord`:
 
 ```json
 {
@@ -272,7 +292,11 @@ The store (`prompts.jsonl` by default) is an append-only JSONL file. Each line i
 }
 ```
 
-Every `build` appends new versioned records. `findLatest()` returns the highest version per name. Re-building always creates new versions — the store never deletes or overwrites. The effective store path is always resolved to an absolute path at runtime (relative `storeFile` values are joined against `process.cwd()`).
+Each build transactionally replaces the JSONL store with a snapshot of the current roots. `findLatest()` returns the highest version per name within that snapshot. If preparation or replacement fails, the previous store is left unchanged and the failure is reported. Temporary snapshot files are cleaned on both success and failure. The effective store path is always resolved to an absolute path at runtime (relative `storeFile` values are joined against `process.cwd()`).
+
+### Managed Emitted Outputs
+
+Emit tracks its generated files in `<storeFile>.outputs.json`. A successful non-dry-run emit removes obsolete files listed in that manifest, while preserving unknown files and prior files for current modules that fail to render. Only files recorded as managed beneath the manifest's recorded output roots are eligible for cleanup. The manifest is replaced transactionally, with temporary files cleaned on success or failure. Dry runs do not change output files, the manifest, or temporary files.
 
 ### Inheritance Resolution
 
@@ -431,7 +455,7 @@ If you need to add a dependency, justify it against these constraints.
 | How to run tests? | `bun test` |
 | Entry point? | `packages/cli/src/index.ts` → `packages/cli/src/cli.ts` |
 | How does a module get its name? | Relative path from `rootDir`, e.g. `agents/coder` from `agents/coder.md` |
-| Where is the store? | Configured in `storeFile`, defaults to `prompts.jsonl`. Append-only JSONL. |
+| Where is the store? | Configured in `storeFile`, defaults to `prompts.jsonl`. Transactional JSONL snapshot of the current roots. |
 | How does inheritance work? | Recursive resolution with deep-clone section merge. See `resolve.ts` `resolve()` function. |
 | How to add a new CLI command? | Add a `case` in `cli.ts` → `run()` switch statement. |
 | Can I add npm dependencies? | No — project philosophy is zero dependencies. Justify if necessary. |
@@ -451,4 +475,4 @@ If you need to add a dependency, justify it against these constraints.
 - **No npm dependencies** — if you import something from `node_modules`, it's wrong
 - **Strict TypeScript** — `noUncheckedIndexedAccess` means array/map access may return `undefined`
 - **Mixed I/O APIs** — the codebase uses a mix of `node:fs/promises`, `node:fs`, and `Bun` runtime APIs depending on the operation. Follow existing patterns in each module rather than choosing one exclusively.
-- **Append-only store** — never modify existing lines in the JSONL file, always append new versions
+- **Transactional store snapshots** — each successful build replaces the JSONL with the current roots; failed builds preserve the prior store

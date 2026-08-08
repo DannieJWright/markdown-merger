@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { build } from "@md-merger/import";
+import { build, normalizeModuleReference, resolveModuleReference } from "@md-merger/import";
+import { readFileSync } from "node:fs";
 import { readStore, findLatest } from "@md-merger/store";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
@@ -17,6 +18,17 @@ afterEach(() => {
 });
 
 describe("build", () => {
+  test("normalizes exact references and optional md suffixes", () => {
+    expect(normalizeModuleReference(" base\\agent.md ")).toBe("base/agent");
+    expect(resolveModuleReference("base/agent.md", new Map([["agent", "user/agent"]]))).toBe("base/agent");
+  });
+
+  test("resolves a bare export and preserves an unexported root-level fallback", () => {
+    const exports = new Map([["agent", "user/agent"]]);
+    expect(resolveModuleReference("agent", exports)).toBe("user/agent");
+    expect(resolveModuleReference("base", exports)).toBe("base");
+  });
+
   test("imports a single module file", async () => {
     writeFileSync(join(rootDir, "base.md"), "---\nname: base\n---\n## Role\nYou are helpful.");
     await build([rootDir], storePath, "test-project");
@@ -32,6 +44,12 @@ describe("build", () => {
     await build([rootDir], storePath, "test-project");
     const record = await findLatest(storePath, "system/base");
     expect(record).toBeDefined();
+  });
+
+  test("preserves leading whitespace in a module filename", async () => {
+    writeFileSync(join(rootDir, " foo.md"), "## Role\nSpace-prefixed module.");
+    await build([rootDir], storePath, "test-project");
+    expect(await findLatest(storePath, " foo")).toBeDefined();
   });
 
   test("handles abstract: true", async () => {
@@ -91,6 +109,18 @@ describe("build", () => {
     expect(record?.sections[0]?.body).toBe("Updated body.");
   });
 
+  test("preserves id and createdAt while incrementing version on rebuild", async () => {
+    writeFileSync(join(rootDir, "identity.md"), "## Role\nInitial.");
+    await build([rootDir], storePath, "test-project");
+    const first = (await readStore(storePath)).find((record) => record.name === "identity")!;
+    writeFileSync(join(rootDir, "identity.md"), "## Role\nUpdated.");
+    await build([rootDir], storePath, "test-project");
+    const second = (await readStore(storePath)).find((record) => record.name === "identity")!;
+    expect(second.id).toBe(first.id);
+    expect(second.createdAt).toBe(first.createdAt);
+    expect(second.version).toBe(first.version + 1);
+  });
+
   test("last root dir wins when same module name exists in multiple roots", async () => {
     const rootA = join(rootDir, "a");
     const rootB = join(rootDir, "b");
@@ -106,5 +136,58 @@ describe("build", () => {
     expect(record).toBeDefined();
     expect(record!.frontmatter).toHaveProperty("name", "BaseB");
     expect(record!.sections[0]?.body).toBe("Role from B.");
+  });
+
+  test("composes later-root exports and canonicalizes extends", async () => {
+    const rootA = join(rootDir, "export-a");
+    const rootB = join(rootDir, "export-b");
+    mkdirSync(join(rootA, "base"), { recursive: true });
+    mkdirSync(join(rootB, "user"), { recursive: true });
+    writeFileSync(join(rootA, "base", "concrete.md"), "---\nextends: [implementation]\n---\n## Role\nConcrete.");
+    writeFileSync(join(rootA, "base", "default.md"), "## Role\nDefault.");
+    writeFileSync(join(rootB, "user", "implementation.md"), "## Role\nUser.");
+    writeFileSync(join(rootA, "md-merger-root.yaml"), "exports:\n  implementation: base/default.md\n");
+    writeFileSync(join(rootB, "md-merger-root.yaml"), "exports:\n  implementation: user/implementation.md\n");
+    const result = await build([rootA, rootB], storePath, "test-project");
+    expect(result.exports).toEqual(new Map([["implementation", "user/implementation"]]));
+    expect(result.exportedModules).toEqual(new Set(["base/default", "user/implementation"]));
+    expect((await findLatest(storePath, "base/concrete"))?.extends).toEqual(["user/implementation"]);
+  });
+
+  test("normalizes md suffixes in exact extends values during build", async () => {
+    writeFileSync(join(rootDir, "parent.md"), "## Role\nParent.");
+    writeFileSync(join(rootDir, "child.md"), "---\nextends: [parent.md]\n---\n## Role\nChild.");
+    await build([rootDir], storePath, "test-project");
+    expect((await findLatest(storePath, "child"))?.extends).toEqual(["parent"]);
+  });
+
+  test("does not mutate the store when any root manifest is invalid", async () => {
+    const rootA = join(rootDir, "valid");
+    const rootB = join(rootDir, "invalid");
+    mkdirSync(rootA, { recursive: true });
+    mkdirSync(rootB, { recursive: true });
+    writeFileSync(join(rootA, "valid.md"), "## Role\nValid.");
+    writeFileSync(join(rootB, "md-merger-root.yaml"), "exports:\n  missing: absent.md\n");
+    writeFileSync(storePath, "sentinel\n");
+    await expect(build([rootA, rootB], storePath, "test-project")).rejects.toThrow("existing store was not updated");
+    expect(readFileSync(storePath, "utf-8")).toBe("sentinel\n");
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+
+  test("removes deleted modules from the replacement snapshot", async () => {
+    writeFileSync(join(rootDir, "old.md"), "## Role\nOld.");
+    await build([rootDir], storePath, "test-project");
+    rmSync(join(rootDir, "old.md"));
+    writeFileSync(join(rootDir, "new.md"), "## Role\nNew.");
+    await build([rootDir], storePath, "test-project");
+    expect((await readStore(storePath)).map((record) => record.name)).toEqual(["new"]);
+  });
+
+  test("preserves sentinel bytes when a root is missing", async () => {
+    const sentinel = JSON.stringify({ sentinel: true }) + "\n";
+    writeFileSync(storePath, sentinel);
+    await expect(build([join(testDir, "missing-root")], storePath, "test-project")).rejects.toThrow("existing store was not updated");
+    expect(readFileSync(storePath, "utf-8")).toBe(sentinel);
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
   });
 });

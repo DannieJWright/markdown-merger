@@ -52,6 +52,18 @@ Run these from the repository root unless a command specifies `--cwd`:
 - Resolved module paths are assumed unique. Collision handling beyond the later-root override rule is deferred to a separate follow-up; do not add incompatible collision behavior incidentally.
 - A generated plugin agent replaces any existing OpenCode `agent` entry with the same key.
 
+### Root export manifest syntax
+
+- A source root may optionally contain `md-merger-root.yaml`. This is a deliberately restricted YAML subset for publishing bare `extends` aliases; do not treat it as general YAML or reuse the project config parser without preserving these rules.
+- The restricted grammar above applies only to `md-merger-root.yaml`; user `.md-merger/config.yaml` files use the project configuration parser and its documented configuration syntax, not root-export entries.
+- The only allowed top-level content is exactly one unindented `exports:` key. The mapping may be empty. Blank lines, full-line comments, and LF or CRLF line endings are allowed.
+- Each export entry must be indented by exactly two spaces and use an unquoted, non-empty scalar alias and target: `  alias: relative/module.md`.
+- Reject quoted scalars, inline comments, inline maps, nested values, list entries, additional/repeated/indented top-level keys, and any other indentation width.
+- Export aliases are non-empty bare names and cannot contain `/` or `\`. Targets must refer to a Markdown module in the same root.
+- Normalize target separators to `/` and remove one trailing `.md`. Reject `.` or `..` segments and paths that are absolute under either POSIX or Windows semantics, including drive-letter and UNC paths.
+- Load and validate every root manifest before appending any store records. Merge valid exports in configured root order; a later root replaces an earlier root's same alias.
+- During build, slash-qualified `extends` references are exact module paths and bypass exports. Bare references consult the combined export map, then fall back to an exact root-level module name when unexported. Store only canonical extensionless module paths so resolver, topology, doctor, and emit remain alias-unaware.
+
 ## TypeScript and dependency conventions
 
 - The workspace uses strict TypeScript, including `noUncheckedIndexedAccess`. Handle possibly absent values explicitly instead of weakening types or using unchecked assertions.

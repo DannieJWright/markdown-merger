@@ -1,6 +1,46 @@
-import { appendFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { appendFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import type { PromptRecord } from "./types";
+
+export interface StoreFileOps {
+  mkdir: typeof mkdir;
+  writeFile: typeof writeFile;
+  rename: typeof rename;
+  rm: typeof rm;
+}
+
+const defaultStoreFileOps: StoreFileOps = { mkdir, writeFile, rename, rm };
+
+export class StoreSnapshotError extends Error {
+  constructor(public readonly phase: "prepare" | "replace", message: string, options: { cause: unknown }) {
+    super(message, options);
+  }
+}
+
+export async function replaceStoreSnapshot(
+  storePath: string,
+  records: PromptRecord[],
+  fileOps: StoreFileOps = defaultStoreFileOps,
+): Promise<void> {
+  const directory = dirname(storePath);
+  const tempPath = join(directory, `.${basename(storePath)}.${crypto.randomUUID()}.tmp`);
+  try {
+    try {
+      await fileOps.mkdir(directory, { recursive: true });
+      const text = records.map((record) => JSON.stringify(record)).join("\n");
+      await fileOps.writeFile(tempPath, text ? `${text}\n` : "", "utf-8");
+    } catch (error) {
+      throw new StoreSnapshotError("prepare", `Unable to prepare store snapshot: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+    try {
+      await fileOps.rename(tempPath, storePath);
+    } catch (error) {
+      throw new StoreSnapshotError("replace", `Unable to replace store snapshot: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+  } finally {
+    await fileOps.rm(tempPath, { force: true }).catch(() => undefined);
+  }
+}
 
 /**
  * Read all valid JSON lines from a JSONL store file.

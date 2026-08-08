@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { readStore, appendRecord, findLatest, updateOrCreate } from "@md-merger/store";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { readStore, appendRecord, findLatest, updateOrCreate, replaceStoreSnapshot } from "@md-merger/store";
+import type { StoreFileOps } from "@md-merger/store";
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { PromptRecord } from "@md-merger/types";
 
@@ -43,6 +44,34 @@ describe("readStore", () => {
     const records = await readStore(testStore);
     expect(records).toHaveLength(1);
     expect(records[0]!.name).toBe("base");
+  });
+});
+
+describe("replaceStoreSnapshot", () => {
+  test("replaces atomically and cleans temporary file", async () => {
+    await replaceStoreSnapshot(testStore, [makeRecord("current")]);
+    expect((await readStore(testStore)).map((record) => record.name)).toEqual(["current"]);
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+  test("preserves original on write failure", async () => {
+    writeFileSync(testStore, JSON.stringify(makeRecord("original")) + "\n");
+    const ops: StoreFileOps = { mkdir: async (...a) => mkdirSync(a[0] as string, { recursive: true }), writeFile: async () => { throw new Error("write boom"); }, rename: async () => {}, rm: async () => {} } as StoreFileOps;
+    await expect(replaceStoreSnapshot(testStore, [makeRecord("new")], ops)).rejects.toThrow("write boom");
+    expect((await readStore(testStore)).map((record) => record.name)).toEqual(["original"]);
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+  test("preserves original on rename failure and cleans temporary file", async () => {
+    writeFileSync(testStore, JSON.stringify(makeRecord("original")) + "\n");
+    const ops: StoreFileOps = { mkdir: async (...a) => mkdirSync(a[0] as string, { recursive: true }), writeFile: async (path, data) => writeFileSync(path as string, data as string), rename: async () => { throw new Error("rename boom"); }, rm: async (path) => rmSync(path as string, { force: true }) } as StoreFileOps;
+    await expect(replaceStoreSnapshot(testStore, [makeRecord("new")], ops)).rejects.toThrow("rename boom");
+    expect((await readStore(testStore)).map((record) => record.name)).toEqual(["original"]);
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+  test("cleans a partially written temp file after write failure", async () => {
+    writeFileSync(testStore, JSON.stringify(makeRecord("original")) + "\n");
+    const ops: StoreFileOps = { mkdir: async (...a) => mkdirSync(a[0] as string, { recursive: true }), writeFile: async (path, data) => { writeFileSync(path as string, (data as string).slice(0, 5)); throw new Error("partial write boom"); }, rename: async () => {}, rm: async (path) => rmSync(path as string, { force: true }) } as StoreFileOps;
+    await expect(replaceStoreSnapshot(testStore, [makeRecord("new")], ops)).rejects.toThrow("partial write boom");
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
   });
 });
 

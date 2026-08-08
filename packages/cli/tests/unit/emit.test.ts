@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { emitAll, renderText } from "@md-merger/emit";
-import { updateOrCreate, findLatest } from "@md-merger/store";
+import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync, readdirSync } from "node:fs";
+import { join, resolve, dirname, basename } from "node:path";
+import { emitAll, emitAllWithMetadata, renderText } from "@md-merger/emit";
+import { updateOrCreate, findLatest, readStore } from "@md-merger/store";
 import type { Config } from "@md-merger/types";
 import { build } from "../../src/import";
 import { DEFAULT_CONFIG } from "../../src/types";
@@ -159,6 +159,171 @@ describe("renderText", () => {
 });
 
 describe("emitAll", () => {
+  test("reconciles an empty store and removes only trusted stale outputs", async () => {
+    const outputRoot = join(testDir, "empty-output");
+    mkdirSync(outputRoot, { recursive: true });
+    const stale = join(outputRoot, "stale.md");
+    const unknown = join(outputRoot, "keep.txt");
+    writeFileSync(stale, "stale");
+    writeFileSync(unknown, "user");
+    writeFileSync(`${storePath}.outputs.json`, JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(stale)] }));
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(unknown)).toBe(true);
+    expect(JSON.parse(readFileSync(`${storePath}.outputs.json`, "utf8"))).toEqual({ version: 1, roots: [resolve(outputRoot)], files: [] });
+  });
+
+  test("writes an absolute manifest and preserves unknown files during lifecycle cleanup", async () => {
+    const input = join(testDir, "lifecycle-input");
+    const outputRoot = join(testDir, "lifecycle-output");
+    mkdirSync(input, { recursive: true });
+    mkdirSync(outputRoot, { recursive: true });
+    writeFileSync(join(input, "old.md"), "---\ntype: agent\n---\n## Role\nOld.");
+    await build([input], storePath, "test");
+    writeFileSync(join(outputRoot, "keep-me.txt"), "user");
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+    rmSync(join(input, "old.md")); mkdirSync(join(input, "nested"));
+    writeFileSync(join(input, "nested", "new.md"), "---\ntype: agent\n---\n## Role\nNew.");
+    await build([input], storePath, "test");
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+    const manifest = JSON.parse(readFileSync(`${storePath}.outputs.json`, "utf8")) as { version: number; roots: string[]; files: string[] };
+    expect(manifest.version).toBe(1);
+    expect(manifest.roots).toEqual([resolve(outputRoot)]);
+    expect(manifest.files).toEqual([resolve(outputRoot, "nested", "new.md")]);
+    expect(existsSync(join(outputRoot, "old.md"))).toBe(false);
+    expect(existsSync(join(outputRoot, "nested", "new.md"))).toBe(true);
+    expect(existsSync(join(outputRoot, "keep-me.txt"))).toBe(true);
+  });
+
+  test("manifest transaction preserves bytes, cause, and temp cleanup", async () => {
+    const outputRoot = join(testDir, "manifest-failure-output"); mkdirSync(outputRoot, { recursive: true });
+    await updateOrCreate(storePath, "one", "test", { sections: [{ name: "role", body: "one" }], frontmatter: {}, status: "active", abstract: false, type: "agent" });
+    const manifestPath = `${storePath}.outputs.json`; writeFileSync(manifestPath, '{"version":1,"roots":[],"files":[]}\n');
+    const before = readFileSync(manifestPath); const sentinel = new Error("sentinel");
+    const ops = { writeFileSync, renameSync: () => { throw sentinel; } };
+    try { await emitAllWithMetadata(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false, ops); throw new Error("expected failure"); }
+    catch (error) { const failure = error as Error & { cause?: unknown }; expect(failure.message).toContain(`Failed to write managed output manifest "${manifestPath}"`); expect(failure.cause).toBe(sentinel); }
+    expect(readFileSync(manifestPath)).toEqual(before);
+    expect(readdirSync(dirname(manifestPath)).some((name) => name.startsWith(`.${basename(manifestPath)}.`) && name.endsWith(".tmp"))).toBe(false);
+  });
+
+  test("retains failed current output and continues emitting other modules", async () => {
+    const outputRoot = join(testDir, "failure-output");
+    await updateOrCreate(storePath, "broken", "test", { sections: [{ name: "role", body: "broken" }], frontmatter: {}, status: "active", abstract: false, type: "agent" });
+    await updateOrCreate(storePath, "good", "test", { sections: [{ name: "role", body: "good" }], frontmatter: {}, status: "active", abstract: false, type: "agent" });
+    mkdirSync(outputRoot, { recursive: true });
+    const brokenPath = join(outputRoot, "broken.md");
+    mkdirSync(brokenPath, { recursive: true });
+    writeFileSync(`${storePath}.outputs.json`, JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(brokenPath)] }));
+    const paths = await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+    expect(paths).toContain(resolve(join(outputRoot, "good.md")));
+    expect(existsSync(brokenPath)).toBe(true);
+    const nextManifest = JSON.parse(readFileSync(`${storePath}.outputs.json`, "utf8")) as { files: string[] };
+    expect([...nextManifest.files].sort()).toEqual([resolve(brokenPath), resolve(outputRoot, "good.md")].sort());
+  });
+
+  test("dry-run preserves output and manifest bytes without temporary manifests", async () => {
+    const outputRoot = join(testDir, "dry-output");
+    await updateOrCreate(storePath, "dry", "test", { sections: [{ name: "role", body: "dry" }], frontmatter: {}, status: "active", abstract: false, type: "agent" });
+    mkdirSync(outputRoot, { recursive: true });
+    const output = join(outputRoot, "dry.md");
+    const manifestPath = `${storePath}.outputs.json`;
+    writeFileSync(output, "before");
+    writeFileSync(manifestPath, JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(output)] }));
+    const beforeOutput = readFileSync(output); const beforeManifest = readFileSync(manifestPath);
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, true);
+    expect(readFileSync(output)).toEqual(beforeOutput);
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readdirSync(testDir).some((name) => name.startsWith("store.jsonl.outputs.json.") && name.endsWith(".tmp"))).toBe(false);
+  });
+
+  test("retains a previously managed output when rendering fails", async () => {
+    const outputRoot = join(testDir, "render-failure-output");
+    mkdirSync(outputRoot, { recursive: true });
+    const prior = join(outputRoot, "broken.md");
+    writeFileSync(prior, "prior bytes");
+    writeFileSync(`${storePath}.outputs.json`, JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(prior)] }));
+    await updateOrCreate(storePath, "broken", "test", { sections: [{ name: "role", body: "broken" }], frontmatter: {}, status: "active", abstract: false, type: "agent" });
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", maxInheritDepth: 0, storeFile: storePath }, false);
+    expect(readFileSync(prior, "utf8")).toBe("prior bytes");
+    const manifest = JSON.parse(readFileSync(`${storePath}.outputs.json`, "utf8")) as { files: string[] };
+    const retainedPath = resolve(prior);
+    expect(manifest.files).toEqual([retainedPath]);
+  });
+
+  test("rejects stale deletion failure with path and preserves manifest", async () => {
+    const outputRoot = join(testDir, "delete-failure-output");
+    mkdirSync(outputRoot, { recursive: true });
+    const stale = join(outputRoot, "stale.md");
+    mkdirSync(stale);
+    const priorManifest = JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(stale)] });
+    writeFileSync(`${storePath}.outputs.json`, priorManifest);
+    try {
+      await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+      throw new Error("expected stale deletion failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const failure = error as Error & { cause?: unknown };
+      expect(failure.message).toContain(`Failed to remove stale managed output "${stale}":`);
+      const cause = failure.cause as NodeJS.ErrnoException;
+      expect(["EFAULT", "EPERM", "EISDIR"]).toContain(cause.code ?? "");
+    }
+    expect(readFileSync(`${storePath}.outputs.json`, "utf8")).toBe(priorManifest);
+  });
+
+  test("does not trust root entries or unsafe prior files for deletion", async () => {
+    const outputRoot = join(testDir, "safe-output"); const outside = join(testDir, "outside.md");
+    mkdirSync(outputRoot, { recursive: true }); writeFileSync(outside, "safe");
+    const manifestPath = `${storePath}.outputs.json`;
+    writeFileSync(manifestPath, JSON.stringify({ version: 1, roots: [resolve(outputRoot)], files: [resolve(outputRoot), resolve(outside)] }));
+    await emitAll(storePath, { agent: outputRoot }, { ...DEFAULT_CONFIG, project: "test", version: "1", storeFile: storePath }, false);
+    expect(existsSync(outputRoot)).toBe(true); expect(existsSync(outside)).toBe(true);
+    expect(JSON.parse(readFileSync(manifestPath, "utf8")).files).toEqual([]);
+  });
+
+  test("handles default/user root export override chains", async () => {
+    const defaultsRoot = join(testDir, "defaults");
+    const userRoot = join(testDir, "user");
+    const outputRoot = join(testDir, "override-output");
+    mkdirSync(join(defaultsRoot, "base"), { recursive: true });
+    mkdirSync(join(userRoot, "user"), { recursive: true });
+
+    writeFileSync(join(defaultsRoot, "base", "base-agent.md"), `---\ntype: agent\nabstract: true\n---\n## Description\nThis is the base agent.`);
+    writeFileSync(join(defaultsRoot, "base", "base-orchestrator.md"), `---\ntype: agent\nextends: [base/base-agent.md]\nabstract: true\n---\n## Description\nThis is the abstract base orchestrator.\n\n## Role\nOrchestrator.`);
+    writeFileSync(join(defaultsRoot, "base", "orchestrator.md"), `---\ntype: agent\nextends: [base-orchestrator]\nabstract: false\n---\n## Description\nThis is the concrete base orchestrator.`);
+    writeFileSync(join(defaultsRoot, "md-merger-root.yaml"), "exports:\n  base-orchestrator: base/base-orchestrator.md\n");
+    writeFileSync(join(userRoot, "user", "base-orchestrator.md"), `---\ntype: agent\nextends: [base/base-orchestrator.md]\nabstract: true\n---\n## Description\nThis is the user's abstract base orchestrator.\n\n## Subrole\nUser Orchestrator.`);
+    writeFileSync(join(userRoot, "md-merger-root.yaml"), "exports:\n  base-orchestrator: user/base-orchestrator.md\n");
+
+    await build([defaultsRoot, userRoot], storePath, "override-project");
+    const config: Config = {
+      project: "override-project",
+      version: "1",
+      maxInheritDepth: 5,
+      storeFile: storePath,
+      emitDirs: { agent: outputRoot },
+      rootDirs: [defaultsRoot, userRoot],
+    };
+    const written = await emitAll(storePath, config.emitDirs, config, false);
+
+    expect(written).toEqual([join(outputRoot, "base", "orchestrator.md")]);
+    const output = readFileSync(join(outputRoot, "base", "orchestrator.md"), "utf-8");
+    expect(output).toContain("This is the concrete base orchestrator.");
+    expect(output).toContain("Orchestrator.");
+    expect(output).toContain("User Orchestrator.");
+    expect(output).not.toContain("This is the abstract base orchestrator.");
+    expect(output).not.toContain("This is the user's abstract base orchestrator.");
+    expect(written.some((path) => path.includes("base-agent") || path.includes("base-orchestrator"))).toBe(false);
+
+    const concrete = await findLatest(storePath, "base/orchestrator");
+    expect(concrete?.extends).toEqual(["user/base-orchestrator"]);
+    const storedNames = (await readStore(storePath)).map((record) => record.name);
+    expect(storedNames).toContain("user/base-orchestrator");
+    expect(storedNames).toContain("base/base-orchestrator");
+    expect((await findLatest(storePath, "user/base-orchestrator"))?.extends).toEqual(["base/base-orchestrator"]);
+    expect((await findLatest(storePath, "base/base-orchestrator"))?.extends).toEqual(["base/base-agent"]);
+  });
+
   test("emits nested module paths under the type route and skips abstract modules", async () => {
     const inputRoot = join(testDir, "input");
     const outputRoot = join(testDir, "out-nested");

@@ -10,6 +10,8 @@
 #   Module .md files can extend other modules via frontmatter:
 #     ---
 #     extends: [system-base, traits/caution]
+#   Bare names must be exported by md-merger-root.yaml (unless they name a
+#   root-level module); slash-qualified names are exact paths.
 #     abstract: false
 #     ---
 #   Child sections override parent sections by name.
