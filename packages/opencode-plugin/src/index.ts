@@ -30,8 +30,9 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
     try {
       if (input.directory) process.chdir(input.directory);
       const config = await loadConfig();
-      const rootDirs = [...await discoverDefaultRoots(defaultsDir), ...config.rootDirs];
-      const { exports, exportedModules } = await build(config, config.storeFile, config.project);
+      const bundledDefaults = await discoverDefaultRoots(defaultsDir);
+        const defaultRoots = bundledDefaults.map((path) => ({ path, optional: false }));
+      const { exports, exportedModules } = await build([...defaultRoots, ...config.resolvedRootDirs], config.storeFile, config.project);
       const aliasesByModule = new Map<string, string[]>();
       for (const [alias, moduleName] of exports) {
         const aliases = aliasesByModule.get(moduleName) ?? [];

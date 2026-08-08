@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { build, normalizeModuleReference, resolveModuleReference } from "@md-merger/import";
 import { readFileSync } from "node:fs";
 import { readStore, findLatest } from "@md-merger/store";
+import { loadConfig } from "../../src/config";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
 const testDir = join(baseTempDir, "evo-test-import-" + Math.random().toString(36).slice(2));
@@ -18,6 +19,16 @@ afterEach(() => {
 });
 
 describe("build", () => {
+  test("loads config roots, skips missing relative root, and preserves later precedence", async () => {
+    const root = join(testDir, "workflow"); const configDir = join(root, "config"); const cwd = join(root, "cwd");
+    const rootA = join(root, "a"); const rootB = join(root, "b"); const outputStore = join(root, "store.jsonl");
+    mkdirSync(configDir, { recursive: true }); mkdirSync(cwd, { recursive: true }); mkdirSync(rootA, { recursive: true }); mkdirSync(rootB, { recursive: true });
+    writeFileSync(join(rootA, "shared.md"), "---\ntype: agent\n---\nA"); writeFileSync(join(rootB, "shared.md"), "---\ntype: agent\n---\nB");
+    const configPath = join(configDir, "config.yaml"); writeFileSync(configPath, `storeFile: ${outputStore}\nrootDirs:\n  - ${rootA}\n  - missing-project-root\n  - ${rootB}\n`);
+    const oldCwd = process.cwd(); const oldConfig = process.env.MD_MERGER_CONFIG; const warning = spyOn(console, "error").mockImplementation(() => {});
+    try { process.env.MD_MERGER_CONFIG = configPath; process.chdir(cwd); const config = await loadConfig(); await build(config, config.storeFile, config.project); expect(warning).toHaveBeenCalledWith(expect.stringContaining("Skipping missing optional root directory")); expect((await readStore(outputStore)).find((record) => record.name === "shared")?.sections[0]?.body).toBe("B"); }
+    finally { warning.mockRestore(); process.chdir(oldCwd); if (oldConfig === undefined) delete process.env.MD_MERGER_CONFIG; else process.env.MD_MERGER_CONFIG = oldConfig; }
+  });
   test("normalizes exact references and optional md suffixes", () => {
     expect(normalizeModuleReference(" base\\agent.md ")).toBe("base/agent");
     expect(resolveModuleReference("base/agent.md", new Map([["agent", "user/agent"]]))).toBe("base/agent");
