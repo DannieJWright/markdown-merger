@@ -29,7 +29,13 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
       if (input.directory) process.chdir(input.directory);
       const config = await loadConfig();
       const rootDirs = [...await discoverDefaultRoots(defaultsDir), ...config.rootDirs];
-      await build(rootDirs, config.storeFile, config.project);
+      const { exports } = await build(rootDirs, config.storeFile, config.project);
+      const aliasesByModule = new Map<string, string[]>();
+      for (const [alias, moduleName] of exports) {
+        const aliases = aliasesByModule.get(moduleName) ?? [];
+        aliases.push(alias);
+        aliasesByModule.set(moduleName, aliases);
+      }
       const emittedFiles = await emitAllWithMetadata(config.storeFile, config.emitDirs, config, false);
       const agentPrompts = new Map<string, string>();
       if (config.emitDirs.agent !== undefined) {
