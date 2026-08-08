@@ -40,7 +40,7 @@ describe("loadRootExports", () => {
     ["duplicate top-level exports", "exports:\nexports:\n", "Duplicate"], ["unknown top-level key", "exports:\nname: root\n", "content"],
     ["inline top-level exports map", "exports: { base: base/agent }\n", "mapping"], ["quoted scalar", "exports:\n  base: 'base/agent'\n", "Invalid"],
     ["inline comment", "exports:\n  base: base/agent # comment\n", "Invalid"], ["inline entry map", "exports:\n  base: { path: base/agent }\n", "Invalid"],
-    ["nested value", "exports:\n  base:\n    path: base/agent\n", "entry"], ["empty alias", "exports:\n  : base/agent\n", "alias"],
+    ["nested value", "exports:\n  base:\n    path: base/agent\n", "entry"], ["empty alias", "exports:\n  : base/agent\n", "Expected a mapping entry"],
     ["slash in alias", "exports:\n  base/agent: base/agent\n", "alias"], ["backslash in alias", "exports:\n  base\\agent: base/agent\n", "alias"],
     ["duplicate alias", "exports:\n  base: base/one\n  base: base/two\n", "Duplicate"], ["empty target", "exports:\n  base:\n", "entry"],
     ["absolute target", "exports:\n  base: /base/agent.md\n", "relative"], ["Windows drive target", "exports:\n  base: C:\\base\\agent.md\n", "relative"],
