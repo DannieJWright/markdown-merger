@@ -302,7 +302,7 @@ describe("emitAll", () => {
       maxInheritDepth: 5,
       storeFile: storePath,
       emitDirs: { agent: outputRoot },
-      rootDirs: [{ path: defaultsRoot, optional: false }, { path: userRoot, optional: false }],
+      rootDirs: [defaultsRoot, userRoot],
     };
     const written = await emitAll(storePath, config.emitDirs, config, false);
 
@@ -331,7 +331,7 @@ describe("emitAll", () => {
     writeFileSync(join(inputRoot, "base", "BasePrimaryAgent.md"), "---\ntype: agent\nabstract: true\n---\n## Role\nBase primary content.");
     writeFileSync(join(inputRoot, "base", "core", "plan-o-strator.md"), "---\ntype: agent\nextends: [base/BasePrimaryAgent]\nabstract: false\n---\n## Role\nConcrete orchestration content.");
     await build([inputRoot], storePath, "test-project");
-    const config: Config = { project: "test-project", version: "1", maxInheritDepth: 5, storeFile: storePath, emitDirs: { agent: outputRoot }, rootDirs: [{ path: inputRoot, optional: false }] };
+    const config: Config = { project: "test-project", version: "1", maxInheritDepth: 5, storeFile: storePath, emitDirs: { agent: outputRoot }, rootDirs: [inputRoot] };
     const written = await emitAll(storePath, config.emitDirs, config, false);
     expect(written).toContain(join(outputRoot, "base", "core", "plan-o-strator.md"));
     expect(written.some((p) => p.includes("BasePrimaryAgent"))).toBe(false);

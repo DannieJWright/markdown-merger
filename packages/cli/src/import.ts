@@ -4,7 +4,7 @@ import { join, relative, sep } from "node:path";
 import { extractFrontmatter, parseSections } from "./frontmatter";
 import { loadRootExports } from "./root-exports";
 import { readStore, replaceStoreSnapshot, StoreSnapshotError } from "./store";
-import type { PromptRecord, RootDir } from "./types";
+import type { PromptRecord, RootDir, ResolvedConfig } from "./types";
 
 type BuildRootDir = string | RootDir;
 
@@ -56,13 +56,16 @@ function moduleName(rootDir: string, filepath: string): string {
  * Root dirs are processed in order and later roots win.
  */
 export async function build(
-  rootDirs: ReadonlyArray<BuildRootDir>,
+  rootDirs: ReadonlyArray<BuildRootDir> | Pick<ResolvedConfig, "resolvedRootDirs">,
   storePath: string,
   project: string,
 ): Promise<BuildResult> {
   try {
     const scans: RootScan[] = [];
-    for (const root of rootDirs.map(normalizeRootDir)) {
+    const roots: RootDir[] = Array.isArray(rootDirs)
+      ? rootDirs.map(normalizeRootDir)
+      : rootDirs.resolvedRootDirs;
+    for (const root of roots) {
       if (!existsSync(root.path) && root.optional) {
         console.error(`[md-merger] Skipping missing optional root directory: ${root.path}`);
         continue;

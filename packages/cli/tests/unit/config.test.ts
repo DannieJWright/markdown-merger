@@ -84,7 +84,7 @@ describe("loadConfig emitDirs", () => {
       expect(configB.emitDirs.skill).toBe(join(rootB, ".opencode", "skills"));
       expect(DEFAULT_CONFIG.emitDirs.agent).toBe(".opencode/agents");
       expect(DEFAULT_CONFIG.emitDirs.skill).toBe(".opencode/skills");
-      expect(DEFAULT_CONFIG.rootDirs).toEqual([{ path: ".md-merger/agents-root/input", optional: true }]);
+      expect(DEFAULT_CONFIG.rootDirs).toEqual([".md-merger/agents-root/input"]);
     } finally {
       process.chdir(originalCwd);
       if (originalConfig === undefined) delete process.env.MD_MERGER_CONFIG; else process.env.MD_MERGER_CONFIG = originalConfig;
@@ -212,7 +212,7 @@ describe("loadConfig CWD path resolution", () => {
     for (const dir of Object.values(config.emitDirs)) {
       expect(dir).toMatch(process.cwd());
     }
-    expect(config.rootDirs).toEqual([{ path: join(process.cwd(), ".md-merger", "agents-root", "input"), optional: true }]);
+    expect(config.rootDirs).toEqual([".md-merger/agents-root/input"]);
   });
 
   test("passes absolute paths through unchanged", async () => {
@@ -228,7 +228,7 @@ describe("loadConfig CWD path resolution", () => {
       const config = await loadConfig();
       expect(config.storeFile).toBe(storeAbs);
       expect(config.emitDirs.default).toBe(tmpDir);
-      expect(config.rootDirs).toEqual([{ path: tmpDir, optional: false }]);
+      expect(config.rootDirs).toEqual([tmpDir]);
     } finally {
       if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;
       else process.env.MD_MERGER_CONFIG = origEnv;
@@ -249,7 +249,7 @@ describe("loadConfig CWD path resolution", () => {
     try {
       process.env.MD_MERGER_CONFIG = cfgPath;
       process.chdir(cwdDir);
-      expect(await loadConfig()).toMatchObject({ rootDirs: [
+      expect(await loadConfig()).toMatchObject({ rootDirs: [absoluteRoot, "relative-root"], resolvedRootDirs: [
         { path: absoluteRoot, optional: false },
         { path: join(cwdDir, "relative-root"), optional: true },
       ] });

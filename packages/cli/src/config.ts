@@ -1,6 +1,6 @@
 import { join, isAbsolute } from "node:path";
 import { DEFAULT_CONFIG } from "./types";
-import type { Config, RootDir } from "./types";
+import type { ResolvedConfig, RootDir } from "./types";
 
 export function getConfigPath(): string {
   const env = process.env.MD_MERGER_CONFIG;
@@ -32,7 +32,7 @@ function parseYamlScalar(value: string): unknown {
   return value;
 }
 
-export async function loadConfig(): Promise<Config> {
+export async function loadConfig(): Promise<ResolvedConfig> {
   const configPath = getConfigPath();
   const resolvedPath = isAbsolute(configPath) || configPath.startsWith("http")
     ? configPath
@@ -116,10 +116,10 @@ export async function loadConfig(): Promise<Config> {
     // File may not exist; fall back to defaults
   }
 
-  const rootDirSources: RootDir[] = Array.isArray(parsed.rootDirs)
-    ? parsed.rootDirs.filter((root): root is string => typeof root === "string").map((root) => ({ path: root, optional: !isAbsolute(root) }))
-    : DEFAULT_CONFIG.rootDirs.map((rootDir) => ({ ...rootDir }));
-  const config: Config = {
+  const rootDirSources: string[] = Array.isArray(parsed.rootDirs)
+    ? parsed.rootDirs.filter((root): root is string => typeof root === "string")
+    : [...DEFAULT_CONFIG.rootDirs];
+  const config: ResolvedConfig = {
     project: typeof parsed.project === "string" ? parsed.project : "default",
     version: typeof parsed.version === "string" ? parsed.version : "1",
     ...DEFAULT_CONFIG,
@@ -128,6 +128,7 @@ export async function loadConfig(): Promise<Config> {
       ? { ...(parsed.emitDirs as Record<string, string>) }
       : { ...DEFAULT_CONFIG.emitDirs },
     rootDirs: rootDirSources,
+    resolvedRootDirs: rootDirSources.map((path) => ({ path, optional: !isAbsolute(path) })),
   };
 
   if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);
@@ -140,9 +141,9 @@ export async function loadConfig(): Promise<Config> {
     }
   }
 
-  config.rootDirs = rootDirSources.map((rootDir): RootDir => ({
-    path: isAbsolute(rootDir.path) ? rootDir.path : join(process.cwd(), rootDir.path),
-    optional: rootDir.optional,
+  config.resolvedRootDirs = rootDirSources.map((path): RootDir => ({
+    path: isAbsolute(path) ? path : join(process.cwd(), path),
+    optional: !isAbsolute(path),
   }));
 
   return config;
