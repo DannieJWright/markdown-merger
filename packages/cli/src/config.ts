@@ -117,7 +117,7 @@ export async function loadConfig(): Promise<Config> {
   }
 
   const rootDirSources: RootDir[] = Array.isArray(parsed.rootDirs)
-    ? parsed.rootDirs.filter((root): root is string => typeof root === "string").map((root) => ({ path: root, optional: false }))
+    ? parsed.rootDirs.filter((root): root is string => typeof root === "string").map((root) => ({ path: root, optional: !isAbsolute(root) }))
     : DEFAULT_CONFIG.rootDirs.map((rootDir) => ({ ...rootDir }));
   const config: Config = {
     project: typeof parsed.project === "string" ? parsed.project : "default",

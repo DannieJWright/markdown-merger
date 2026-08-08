@@ -20,3 +20,26 @@ Implemented Task 2 and Task 1 remediation findings.
 ## Commit
 
 - `9b32cf3 feat: skip missing optional root directories`
+
+## Review remediation
+
+- Parsed YAML root entries now derive provenance from the declared value: relative roots resolve against the process CWD and are optional, while absolute roots remain required.
+- The mixed-root test now places the config file under one directory and changes CWD to a different directory, proving relative resolution uses CWD and preserves `optional: true`.
+
+### Command outputs
+
+`bun test --cwd packages/cli tests/unit/config.test.ts`
+
+```
+12 pass
+0 fail
+30 expect() calls
+```
+
+`bun test --cwd packages/cli tests/unit/import.test.ts`
+
+```
+20 pass
+0 fail
+43 expect() calls
+```

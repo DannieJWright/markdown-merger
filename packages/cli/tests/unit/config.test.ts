@@ -239,17 +239,19 @@ describe("loadConfig CWD path resolution", () => {
   test("preserves absolute and relative root provenance independently", async () => {
     const tmpDir = join(baseTempDir, "evo-mixed-test-" + Math.random().toString(36).slice(2));
     const cfgPath = join(tmpDir, "abs.yaml");
+    const cwdDir = join(tmpDir, "working-directory");
     const absoluteRoot = join(tmpDir, "absolute-root");
     mkdirSync(tmpDir, { recursive: true });
+    mkdirSync(cwdDir, { recursive: true });
     writeFileSync(cfgPath, `rootDirs:\n  - ${absoluteRoot}\n  - relative-root`);
     const originalEnv = process.env.MD_MERGER_CONFIG;
     const originalCwd = process.cwd();
     try {
       process.env.MD_MERGER_CONFIG = cfgPath;
-      process.chdir(tmpDir);
+      process.chdir(cwdDir);
       expect(await loadConfig()).toMatchObject({ rootDirs: [
         { path: absoluteRoot, optional: false },
-        { path: join(tmpDir, "relative-root"), optional: false },
+        { path: join(cwdDir, "relative-root"), optional: true },
       ] });
     } finally {
       process.chdir(originalCwd);
