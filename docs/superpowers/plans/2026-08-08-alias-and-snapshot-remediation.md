@@ -1,6 +1,6 @@
 # Alias and Snapshot Remediation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (required) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Suppress canonical OpenCode keys for every exported module, replace stale append-only stores with transactional source snapshots, and remove only obsolete files previously managed by md-merger.
 

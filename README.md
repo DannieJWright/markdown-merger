@@ -252,6 +252,8 @@ Every root manifest is loaded and validated before any build records are written
 
 The OpenCode plugin also uses the final export map as its public agent-name registry. A concrete `type: agent` module targeted by one or more active aliases is injected under each alias instead of its canonical module path. Canonical plugin keys are suppressed for every target named by any root manifest, including targets superseded when a later root replaces an alias; only the later alias target is exposed under that alias. An unexported concrete agent keeps its path-derived name. This affects only OpenCode agent keys; module names, inheritance, store records, and emitted paths remain canonical.
 
+Alias ownership belongs only to the final later-root-wins root-export map; `extends` never transfers alias ownership. For example: (1) if a project replaces the bundled `base/core/plan-o-strator` at the same path, OpenCode injects only `plan-o-strator` with the project replacement; (2) if a project adds `base/plan-o-strator` extending the bundled target without exporting it, OpenCode injects both `plan-o-strator` for the bundled target and `base/plan-o-strator` for the merged child; (3) if that project also exports `plan-o-strator: base/plan-o-strator`, OpenCode injects only `plan-o-strator` with the merged child content. All manifest targets, including superseded targets, keep their canonical plugin keys suppressed.
+
 ### Frontmatter
 
 Each `.md` file supports YAML frontmatter:

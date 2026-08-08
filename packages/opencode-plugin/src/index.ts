@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const packageDefaultsDir = join(moduleDir, "..", "defaults");
+const cliDefaultsDir = join(dirname(fileURLToPath(import.meta.resolve("@md-merger/cli/package.json"))), "defaults");
+const runtimeDefaultsDir = existsSync(packageDefaultsDir) ? packageDefaultsDir : cliDefaultsDir;
 
 export async function discoverDefaultRoots(defaultsDir: string): Promise<string[]> {
   if (!existsSync(defaultsDir)) return [];
@@ -71,4 +73,4 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
   };
 }
 
-export const mdMergerPlugin: Plugin = createMdMergerPlugin(packageDefaultsDir);
+export const mdMergerPlugin: Plugin = createMdMergerPlugin(runtimeDefaultsDir);

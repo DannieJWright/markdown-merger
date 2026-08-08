@@ -56,4 +56,4 @@ Add focused plugin integration coverage at the CLI/plugin boundary using tempora
 
 Implementation follows test-driven development: write or update the focused failing plugin integration tests before production changes, implement the minimal metadata/key-selection path, then run the focused suite and typecheck.
 
-Execution must use the `subagent-driven-development` skill for independently bounded implementation and review work. The `deepwork` skill is not required because this is a small, isolated CLI/plugin boundary adjustment; if scope expands into a high-risk multi-phase effort, reassess and activate it before implementation.
+The `deepwork` skill is not required because this is a small, isolated CLI/plugin boundary adjustment.
