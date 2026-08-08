@@ -1,9 +1,16 @@
 import { access, constants as fsConstants, readdir, readFile, stat, truncate } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { extractFrontmatter, parseSections } from "./frontmatter";
 import { loadRootExports } from "./root-exports";
 import { readStore, replaceStoreSnapshot, StoreSnapshotError } from "./store";
-import type { PromptRecord } from "./types";
+import type { PromptRecord, RootDir, ResolvedConfig } from "./types";
+
+type BuildRootDir = string | RootDir;
+
+function normalizeRootDir(rootDir: BuildRootDir): RootDir {
+  return typeof rootDir === "string" ? { path: rootDir, optional: false } : rootDir;
+}
 
 /**
  * Recursively glob all `.md` files under a root directory.
@@ -49,15 +56,22 @@ function moduleName(rootDir: string, filepath: string): string {
  * Root dirs are processed in order and later roots win.
  */
 export async function build(
-  rootDirs: string[],
+  rootDirs: ReadonlyArray<BuildRootDir> | Pick<ResolvedConfig, "resolvedRootDirs">,
   storePath: string,
   project: string,
 ): Promise<BuildResult> {
   try {
     const scans: RootScan[] = [];
-    for (const rootDir of rootDirs) {
-      const files = await globMd(rootDir);
-      scans.push({ rootDir, files, moduleNames: new Set(files.map((file) => moduleName(rootDir, file))) });
+    const roots: RootDir[] = "resolvedRootDirs" in rootDirs
+      ? rootDirs.resolvedRootDirs
+      : [...rootDirs].map(normalizeRootDir);
+    for (const root of roots) {
+      if (!existsSync(root.path) && root.optional) {
+        console.error(`[md-merger] Skipping missing optional root directory: ${root.path}`);
+        continue;
+      }
+      const files = await globMd(root.path);
+      scans.push({ rootDir: root.path, files, moduleNames: new Set(files.map((file) => moduleName(root.path, file))) });
     }
   const exports = new Map<string, string>();
   const exportedModules = new Set<string>();

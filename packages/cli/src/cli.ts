@@ -27,7 +27,7 @@ export async function run(argv: string[]): Promise<void> {
 
   switch (cmd) {
     case "build": {
-      await build(config.rootDirs, storePath, config.project);
+      await build(config, storePath, config.project);
       console.log(`Built ${config.rootDirs.length} root dir(s) into ${storePath}`);
       break;
     }

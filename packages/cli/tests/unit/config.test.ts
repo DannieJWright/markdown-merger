@@ -1,10 +1,16 @@
-import { describe, test, expect, spyOn } from "bun:test";
+import { describe, test, expect, spyOn, beforeEach, afterAll } from "bun:test";
 import { getConfigPath, loadConfig } from "@md-merger/config";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { DEFAULT_CONFIG } from "../../src/types";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
+const initialConfigEnv = process.env.MD_MERGER_CONFIG;
+beforeEach(() => delete process.env.MD_MERGER_CONFIG);
+afterAll(() => {
+  if (initialConfigEnv === undefined) delete process.env.MD_MERGER_CONFIG;
+  else process.env.MD_MERGER_CONFIG = initialConfigEnv;
+});
 describe("getConfigPath", () => {
   test("uses MD_MERGER_CONFIG env var when set", () => {
     const orig = process.env.MD_MERGER_CONFIG;
@@ -206,9 +212,7 @@ describe("loadConfig CWD path resolution", () => {
     for (const dir of Object.values(config.emitDirs)) {
       expect(dir).toMatch(process.cwd());
     }
-    for (const dir of config.rootDirs) {
-      expect(dir).toMatch(process.cwd());
-    }
+    expect(config.rootDirs).toEqual([".md-merger/agents-root/input"]);
   });
 
   test("passes absolute paths through unchanged", async () => {
@@ -228,6 +232,31 @@ describe("loadConfig CWD path resolution", () => {
     } finally {
       if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;
       else process.env.MD_MERGER_CONFIG = origEnv;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves absolute and relative root provenance independently", async () => {
+    const tmpDir = join(baseTempDir, "evo-mixed-test-" + Math.random().toString(36).slice(2));
+    const cfgPath = join(tmpDir, "abs.yaml");
+    const cwdDir = join(tmpDir, "working-directory");
+    const absoluteRoot = join(tmpDir, "absolute-root");
+    mkdirSync(tmpDir, { recursive: true });
+    mkdirSync(cwdDir, { recursive: true });
+    writeFileSync(cfgPath, `rootDirs:\n  - ${absoluteRoot}\n  - relative-root`);
+    const originalEnv = process.env.MD_MERGER_CONFIG;
+    const originalCwd = process.cwd();
+    try {
+      process.env.MD_MERGER_CONFIG = cfgPath;
+      process.chdir(cwdDir);
+      expect(await loadConfig()).toMatchObject({ rootDirs: [absoluteRoot, "relative-root"], resolvedRootDirs: [
+        { path: absoluteRoot, optional: false },
+        { path: join(cwdDir, "relative-root"), optional: true },
+      ] });
+    } finally {
+      process.chdir(originalCwd);
+      if (originalEnv === undefined) delete process.env.MD_MERGER_CONFIG;
+      else process.env.MD_MERGER_CONFIG = originalEnv;
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });

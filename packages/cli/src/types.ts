@@ -19,6 +19,11 @@ export interface PromptRecord {
   updatedAt: string;
 }
 
+export interface RootDir {
+  path: string;
+  optional: boolean;
+}
+
 export interface Config {
   project: string;
   version: string;
@@ -26,6 +31,11 @@ export interface Config {
   storeFile: string;
   emitDirs: Record<string, string>;
   rootDirs: string[];
+}
+
+export interface ResolvedConfig extends Omit<Config, "rootDirs"> {
+  rootDirs: string[];
+  resolvedRootDirs: RootDir[];
 }
 
 export interface RenderResult {

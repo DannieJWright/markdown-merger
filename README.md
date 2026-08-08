@@ -211,6 +211,8 @@ rootDirs:
   - .md-merger/agents-root/input
 ```
 
+`rootDirs` are resolved from the process working directory. Relative entries are optional: if absent, md-merger writes a warning to stderr and continues. Absolute entries are required and a missing directory fails the build. This permits a global `MD_MERGER_CONFIG` to combine required shared imports with project-local imports.
+
 ### Environment Variables
 
 | Variable | Purpose |
