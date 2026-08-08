@@ -37,8 +37,11 @@
 **Interfaces:**
 - Produces `RootDir { path: string; optional: boolean }`.
 - Changes `Config.rootDirs` to `RootDir[]`.
+- Tests must not read the caller's `MD_MERGER_CONFIG`; preserve it before the suite, delete it before each test, and restore it after the suite.
 
 - [ ] **Step 1: Write failing resolution tests**
+
+At file scope, capture the initial `MD_MERGER_CONFIG`, then add `beforeEach`/`afterAll` hooks that delete it for every test and restore the captured value after all tests. Import the hooks from `bun:test`. This makes default-config tests reproducible while existing tests can explicitly set and restore their fixture config paths.
 
 Change current root assertions to expect `[{ path: join(process.cwd(), ".md-merger", "agents-root", "input"), optional: true }]` and, for an absolute root, `[{ path: tmpDir, optional: false }]`.
 
