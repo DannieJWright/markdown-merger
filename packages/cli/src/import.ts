@@ -62,9 +62,9 @@ export async function build(
 ): Promise<BuildResult> {
   try {
     const scans: RootScan[] = [];
-    const roots: RootDir[] = Array.isArray(rootDirs)
-      ? rootDirs.map(normalizeRootDir)
-      : rootDirs.resolvedRootDirs;
+    const roots: RootDir[] = "resolvedRootDirs" in rootDirs
+      ? rootDirs.resolvedRootDirs
+      : [...rootDirs].map(normalizeRootDir);
     for (const root of roots) {
       if (!existsSync(root.path) && root.optional) {
         console.error(`[md-merger] Skipping missing optional root directory: ${root.path}`);
