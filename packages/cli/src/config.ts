@@ -116,16 +116,18 @@ export async function loadConfig(): Promise<Config> {
     // File may not exist; fall back to defaults
   }
 
-  const rootDirSources = Array.isArray(parsed.rootDirs)
-    ? parsed.rootDirs as string[]
-    : DEFAULT_CONFIG.rootDirs.map((rootDir) => rootDir.path);
+  const rootDirSources: RootDir[] = Array.isArray(parsed.rootDirs)
+    ? parsed.rootDirs.filter((root): root is string => typeof root === "string").map((root) => ({ path: root, optional: false }))
+    : DEFAULT_CONFIG.rootDirs.map((rootDir) => ({ ...rootDir }));
   const config: Config = {
+    project: typeof parsed.project === "string" ? parsed.project : "default",
+    version: typeof parsed.version === "string" ? parsed.version : "1",
     ...DEFAULT_CONFIG,
     ...parsed,
     emitDirs: parsed.emitDirs && typeof parsed.emitDirs === "object"
       ? { ...(parsed.emitDirs as Record<string, string>) }
       : { ...DEFAULT_CONFIG.emitDirs },
-    rootDirs: [],
+    rootDirs: rootDirSources,
   };
 
   if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);
@@ -139,8 +141,8 @@ export async function loadConfig(): Promise<Config> {
   }
 
   config.rootDirs = rootDirSources.map((rootDir): RootDir => ({
-    path: isAbsolute(rootDir) ? rootDir : join(process.cwd(), rootDir),
-    optional: !isAbsolute(rootDir),
+    path: isAbsolute(rootDir.path) ? rootDir.path : join(process.cwd(), rootDir.path),
+    optional: rootDir.optional,
   }));
 
   return config;

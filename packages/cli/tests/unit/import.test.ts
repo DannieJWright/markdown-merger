@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { build, normalizeModuleReference, resolveModuleReference } from "@md-merger/import";
@@ -189,5 +189,28 @@ describe("build", () => {
     await expect(build([join(testDir, "missing-root")], storePath, "test-project")).rejects.toThrow("existing store was not updated");
     expect(readFileSync(storePath, "utf-8")).toBe(sentinel);
     expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+
+  test("skips missing optional roots while importing required roots", async () => {
+    writeFileSync(join(rootDir, "global.md"), "## Role\nGlobal.");
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await build([
+        { path: rootDir, optional: false },
+        { path: join(testDir, ".md-merger", "inputs", "agents"), optional: true },
+      ], storePath, "test-project");
+      expect(await findLatest(storePath, "global")).toBeDefined();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Skipping missing optional root directory"));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("does not update the store when a required root is missing", async () => {
+    const sentinel = "sentinel\n";
+    writeFileSync(storePath, sentinel);
+    await expect(build([{ path: join(testDir, "missing-required-root"), optional: false }], storePath, "test-project"))
+      .rejects.toThrow("existing store was not updated");
+    expect(readFileSync(storePath, "utf-8")).toBe(sentinel);
   });
 });
