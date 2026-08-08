@@ -63,3 +63,25 @@ Result: 16 passed, 0 failed, 53 expect() calls. Existing expected initialization
 Commit: `0881b164cafb4d30d75af7a497c2fd82caf45317` (`test(plugin): cover alias injection cases`)
 
 Self-review: only `packages/opencode-plugin/tests/plugin.test.ts` and this report were changed for the follow-up; production code and unrelated files were not staged.
+
+## Inherited concrete alias correction
+
+Focused command before test changes:
+
+```bash
+bun test --cwd packages/opencode-plugin tests/plugin.test.ts
+```
+
+Result: 16 passed, 0 failed, 53 expect() calls.
+
+Added an isolated fixture proving an exported concrete default agent extending an abstract parent is injected only under its active alias, with inherited and concrete prompt content preserved.
+
+Focused command after test changes:
+
+```bash
+bun test --cwd packages/opencode-plugin tests/plugin.test.ts
+```
+
+Result: 17 passed, 0 failed, 56 expect() calls. Existing expected initialization error logs remain from invalid-root and missing-root tests.
+
+Commit: `b51db87ab94e8cfc9ea609f9ef4970f8650330c2` (`test(plugin): cover inherited alias injection`)
