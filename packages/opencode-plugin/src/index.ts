@@ -44,7 +44,11 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
           if (emittedFile.type !== "agent") continue;
           const key = toAgentKey(agentRoot, resolve(emittedFile.path));
           if (key === undefined) continue;
-          try { agentPrompts.set(key, await readFile(resolve(emittedFile.path), "utf-8")); }
+          try {
+            const prompt = await readFile(resolve(emittedFile.path), "utf-8");
+            const keys = aliasesByModule.get(key) ?? [key];
+            for (const injectionKey of keys) agentPrompts.set(injectionKey, prompt);
+          }
           catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedFile.path}`); }
         }
       }
