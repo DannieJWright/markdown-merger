@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emitAll, renderText } from "@md-merger/emit";
-import { updateOrCreate, findLatest } from "@md-merger/store";
+import { updateOrCreate, findLatest, readStore } from "@md-merger/store";
 import type { Config } from "@md-merger/types";
 import { build } from "../../src/import";
 import { DEFAULT_CONFIG } from "../../src/types";
@@ -159,6 +159,49 @@ describe("renderText", () => {
 });
 
 describe("emitAll", () => {
+  test("handles default/user root export override chains", async () => {
+    const defaultsRoot = join(testDir, "defaults");
+    const userRoot = join(testDir, "user");
+    const outputRoot = join(testDir, "override-output");
+    mkdirSync(join(defaultsRoot, "base"), { recursive: true });
+    mkdirSync(join(userRoot, "user"), { recursive: true });
+
+    writeFileSync(join(defaultsRoot, "base", "base-agent.md"), `---\ntype: agent\nabstract: true\n---\n## Description\nThis is the base agent.`);
+    writeFileSync(join(defaultsRoot, "base", "base-orchestrator.md"), `---\ntype: agent\nextends: [base/base-agent.md]\nabstract: true\n---\n## Description\nThis is the abstract base orchestrator.\n\n## Role\nOrchestrator.`);
+    writeFileSync(join(defaultsRoot, "base", "orchestrator.md"), `---\ntype: agent\nextends: [base-orchestrator]\nabstract: false\n---\n## Description\nThis is the concrete base orchestrator.`);
+    writeFileSync(join(defaultsRoot, "md-merger-root.yaml"), "exports:\n  base-orchestrator: base/base-orchestrator.md\n");
+    writeFileSync(join(userRoot, "user", "base-orchestrator.md"), `---\ntype: agent\nextends: [base/base-orchestrator.md]\nabstract: true\n---\n## Description\nThis is the user's abstract base orchestrator.\n\n## Subrole\nUser Orchestrator.`);
+    writeFileSync(join(userRoot, "md-merger-root.yaml"), "exports:\n  base-orchestrator: user/base-orchestrator.md\n");
+
+    await build([defaultsRoot, userRoot], storePath, "override-project");
+    const config: Config = {
+      project: "override-project",
+      version: "1",
+      maxInheritDepth: 5,
+      storeFile: storePath,
+      emitDirs: { agent: outputRoot },
+      rootDirs: [defaultsRoot, userRoot],
+    };
+    const written = await emitAll(storePath, config.emitDirs, config, false);
+
+    expect(written).toEqual([join(outputRoot, "base", "orchestrator.md")]);
+    const output = readFileSync(join(outputRoot, "base", "orchestrator.md"), "utf-8");
+    expect(output).toContain("This is the concrete base orchestrator.");
+    expect(output).toContain("Orchestrator.");
+    expect(output).toContain("User Orchestrator.");
+    expect(output).not.toContain("This is the abstract base orchestrator.");
+    expect(output).not.toContain("This is the user's abstract base orchestrator.");
+    expect(written.some((path) => path.includes("base-agent") || path.includes("base-orchestrator"))).toBe(false);
+
+    const concrete = await findLatest(storePath, "base/orchestrator");
+    expect(concrete?.extends).toEqual(["user/base-orchestrator"]);
+    const storedNames = (await readStore(storePath)).map((record) => record.name);
+    expect(storedNames).toContain("user/base-orchestrator");
+    expect(storedNames).toContain("base/base-orchestrator");
+    expect((await findLatest(storePath, "user/base-orchestrator"))?.extends).toEqual(["base/base-orchestrator"]);
+    expect((await findLatest(storePath, "base/base-orchestrator"))?.extends).toEqual(["base/base-agent"]);
+  });
+
   test("emits nested module paths under the type route and skips abstract modules", async () => {
     const inputRoot = join(testDir, "input");
     const outputRoot = join(testDir, "out-nested");

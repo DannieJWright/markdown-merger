@@ -236,6 +236,20 @@ When no config file exists, the following defaults apply (from `types.ts`). Note
 
 Module names are derived from the relative path within a `rootDir`. A file at `.md-merger/agents-root/input/agents/coder.md` inside rootDir `.md-merger/agents-root/input` gets module name `agents/coder`. Multiple root directories are processed in order and later roots win: if the same module path exists in more than one root, the last root's definition overrides earlier ones.
 
+#### Root Exports
+
+A root may optionally contain a fixed top-level file named `md-merger-root.yaml` to publish aliases for bare inheritance references. Targets belong to that same root. For example:
+
+```yaml
+exports:
+  orchestrator: base/orchestrator.md
+  base-orchestrator: base/base-orchestrator
+```
+
+This manifest is a deliberately restricted YAML subset, not general YAML. It accepts blank lines, full-line comments, and LF or CRLF line endings, with exactly one unindented `exports:` key followed by exactly two-space-indented, unquoted scalar entries. The mapping may be empty. Quoted scalars, inline comments or maps, nested values, list entries, extra or repeated top-level keys, indented top-level keys, and other indentation widths are rejected. Export aliases are non-empty bare names; targets are normalized same-root Markdown module paths.
+
+Every root manifest is loaded and validated before any build records are written. Valid exports are combined in root order, so a later root replaces an earlier root's alias. Invalid manifests abort the build before records are written.
+
 ### Frontmatter
 
 Each `.md` file supports YAML frontmatter:
@@ -248,9 +262,11 @@ abstract: true                           # Exclude from emit output
 ---
 ```
 
-- `extends` — list of parent module names. Processed left-to-right; later parents override earlier ones.
+- `extends` — list of parent references. References are resolved in this order: (1) path separators are normalized and an optional `.md` suffix is removed; (2) slash-qualified references are exact module paths and bypass exports; (3) bare names consult the combined export registry, where later roots win; (4) an unexported bare name falls back to an exact root-level module name. Processed left-to-right; later parents override earlier ones.
 - `type` — used as key into `emitDirs` for output routing. Modules without `type` are skipped during emit.
 - `abstract` — modules marked abstract are included in inheritance resolution but excluded from emit output.
+
+For example, the concrete `base/orchestrator` can extend the bare `base-orchestrator`. A project root can override that alias to `user/base-orchestrator`, while the project module extends the exact `base/base-orchestrator` path. That override chain injects the project `Subrole` without changing the exact default inheritance, so the resolved output preserves the default `Role` and adds `Subrole`. Exact references remain stable even when a later root replaces an alias.
 
 ### JSONL Store
 
