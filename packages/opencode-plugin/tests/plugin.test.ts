@@ -153,6 +153,25 @@ describe.serial("plugin initialization", () => {
     } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
   });
 
+  it("injects an inherited concrete default under its active alias only", async () => {
+    const root = join(import.meta.dirname, "build", `inherited-alias-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults"); const bundled = join(defaults, "agents"); const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true }); mkdirSync(join(bundled, "base"), { recursive: true });
+    writeFileSync(join(bundled, "base.md"), "---\ntype: agent\nabstract: true\n---\n## Role\nInherited parent content.");
+    writeFileSync(join(bundled, "base", "concrete.md"), "---\ntype: agent\nextends: [base]\n---\n## Workflow\nConcrete child content.");
+    writeFileSync(join(bundled, "md-merger-root.yaml"), "exports:\n  orchestrator: base/concrete.md\n");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\nrootDirs: []\n`);
+    process.env.MD_MERGER_CONFIG = join(root, ".md-merger", "config.yaml");
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
+      const config: Record<string, unknown> = {}; await (hooks as any).config(config);
+      const agents = config.agent as Record<string, { prompt: string }>;
+      expect(agents.orchestrator?.prompt).toContain("Inherited parent content.");
+      expect(agents.orchestrator?.prompt).toContain("Concrete child content.");
+      expect(agents["base/concrete"]).toBeUndefined();
+    } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("covers alias-only, multi-alias, fallback, abstract, and non-agent injection", async () => {
     const root = join(import.meta.dirname, "build", `alias-coverage-${Math.random().toString(36).slice(2)}`);
     const defaults = join(root, "defaults"); const bundled = join(defaults, "agents"); const project = join(root, "project"); const out = join(root, "out");
