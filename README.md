@@ -250,6 +250,8 @@ This manifest is a deliberately restricted YAML subset, not general YAML. It acc
 
 Every root manifest is loaded and validated before any build records are written. Valid exports are combined in root order, so a later root replaces an earlier root's alias. Invalid manifests abort the build before records are written.
 
+The OpenCode plugin also uses the final export map as its public agent-name registry. A concrete `type: agent` module targeted by one or more active aliases is injected under each alias instead of its canonical module path. An unexported concrete agent keeps its path-derived name. If multiple roots publish the same alias, only the last root's target is exposed under that name. This affects only OpenCode agent keys; module names, inheritance, store records, and emitted paths remain canonical.
+
 ### Frontmatter
 
 Each `.md` file supports YAML frontmatter:
