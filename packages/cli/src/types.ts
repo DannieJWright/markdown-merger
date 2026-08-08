@@ -19,13 +19,18 @@ export interface PromptRecord {
   updatedAt: string;
 }
 
+export interface RootDir {
+  path: string;
+  optional: boolean;
+}
+
 export interface Config {
   project: string;
   version: string;
   maxInheritDepth: number;
   storeFile: string;
   emitDirs: Record<string, string>;
-  rootDirs: string[];
+  rootDirs: RootDir[];
 }
 
 export interface RenderResult {
@@ -40,5 +45,5 @@ export const DEFAULT_CONFIG: Omit<Config, "project" | "version"> = {
   maxInheritDepth: DEFAULT_MAX_INHERIT_DEPTH,
   storeFile: "prompts.jsonl",
   emitDirs: { default: "output", agent: ".opencode/agents", skill: ".opencode/skills" },
-  rootDirs: [".md-merger/agents-root/input"],
+  rootDirs: [{ path: ".md-merger/agents-root/input", optional: true }],
 };

@@ -1,10 +1,16 @@
-import { describe, test, expect, spyOn } from "bun:test";
+import { describe, test, expect, spyOn, beforeEach, afterAll } from "bun:test";
 import { getConfigPath, loadConfig } from "@md-merger/config";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { DEFAULT_CONFIG } from "../../src/types";
 
 const baseTempDir = join(import.meta.dirname, "..", "build", "tmp");
+const initialConfigEnv = process.env.MD_MERGER_CONFIG;
+beforeEach(() => delete process.env.MD_MERGER_CONFIG);
+afterAll(() => {
+  if (initialConfigEnv === undefined) delete process.env.MD_MERGER_CONFIG;
+  else process.env.MD_MERGER_CONFIG = initialConfigEnv;
+});
 describe("getConfigPath", () => {
   test("uses MD_MERGER_CONFIG env var when set", () => {
     const orig = process.env.MD_MERGER_CONFIG;
@@ -78,7 +84,7 @@ describe("loadConfig emitDirs", () => {
       expect(configB.emitDirs.skill).toBe(join(rootB, ".opencode", "skills"));
       expect(DEFAULT_CONFIG.emitDirs.agent).toBe(".opencode/agents");
       expect(DEFAULT_CONFIG.emitDirs.skill).toBe(".opencode/skills");
-      expect(DEFAULT_CONFIG.rootDirs).toEqual([".md-merger/agents-root/input"]);
+      expect(DEFAULT_CONFIG.rootDirs).toEqual([{ path: ".md-merger/agents-root/input", optional: true }]);
     } finally {
       process.chdir(originalCwd);
       if (originalConfig === undefined) delete process.env.MD_MERGER_CONFIG; else process.env.MD_MERGER_CONFIG = originalConfig;
@@ -206,9 +212,7 @@ describe("loadConfig CWD path resolution", () => {
     for (const dir of Object.values(config.emitDirs)) {
       expect(dir).toMatch(process.cwd());
     }
-    for (const dir of config.rootDirs) {
-      expect(dir).toMatch(process.cwd());
-    }
+    expect(config.rootDirs).toEqual([{ path: join(process.cwd(), ".md-merger", "agents-root", "input"), optional: true }]);
   });
 
   test("passes absolute paths through unchanged", async () => {
@@ -224,7 +228,7 @@ describe("loadConfig CWD path resolution", () => {
       const config = await loadConfig();
       expect(config.storeFile).toBe(storeAbs);
       expect(config.emitDirs.default).toBe(tmpDir);
-      expect(config.rootDirs).toEqual([tmpDir]);
+      expect(config.rootDirs).toEqual([{ path: tmpDir, optional: false }]);
     } finally {
       if (origEnv === undefined) delete process.env.MD_MERGER_CONFIG;
       else process.env.MD_MERGER_CONFIG = origEnv;

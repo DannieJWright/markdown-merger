@@ -1,6 +1,6 @@
 import { join, isAbsolute } from "node:path";
 import { DEFAULT_CONFIG } from "./types";
-import type { Config } from "./types";
+import type { Config, RootDir } from "./types";
 
 export function getConfigPath(): string {
   const env = process.env.MD_MERGER_CONFIG;
@@ -116,16 +116,17 @@ export async function loadConfig(): Promise<Config> {
     // File may not exist; fall back to defaults
   }
 
+  const rootDirSources = Array.isArray(parsed.rootDirs)
+    ? parsed.rootDirs as string[]
+    : DEFAULT_CONFIG.rootDirs.map((rootDir) => rootDir.path);
   const config: Config = {
     ...DEFAULT_CONFIG,
     ...parsed,
     emitDirs: parsed.emitDirs && typeof parsed.emitDirs === "object"
       ? { ...(parsed.emitDirs as Record<string, string>) }
       : { ...DEFAULT_CONFIG.emitDirs },
-    rootDirs: Array.isArray(parsed.rootDirs)
-      ? [...(parsed.rootDirs as string[])]
-      : [...DEFAULT_CONFIG.rootDirs],
-  } as Config;
+    rootDirs: [],
+  };
 
   if (!isAbsolute(config.storeFile)) config.storeFile = join(process.cwd(), config.storeFile);
 
@@ -137,7 +138,10 @@ export async function loadConfig(): Promise<Config> {
     }
   }
 
-  config.rootDirs = config.rootDirs.map(d => isAbsolute(d) ? d : join(process.cwd(), d));
+  config.rootDirs = rootDirSources.map((rootDir): RootDir => ({
+    path: isAbsolute(rootDir) ? rootDir : join(process.cwd(), rootDir),
+    optional: !isAbsolute(rootDir),
+  }));
 
   return config;
 }
