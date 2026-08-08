@@ -27,14 +27,14 @@ The project is written in TypeScript with zero npm dependencies — all parsing,
 | `config.ts` | Hand-rolled YAML parser for `.md-merger/config.yaml`, default config resolution |
 | `import.ts` | Recursively glob `.md` files from `rootDirs`, parse, write records to JSONL store |
 | `frontmatter.ts` | YAML frontmatter extraction, hierarchical section parsing (arbitrary nesting depth), markdown rendering |
-| `store.ts` | Append-only JSONL store — `readStore`, `appendRecord`, `findLatest`, `updateOrCreate` |
+| `store.ts` | Transactional JSONL snapshot store — `readStore`, snapshot replacement, `findLatest` |
 | `resolve.ts` | Recursive inheritance resolution with cycle detection, topological sort (Kahn's algorithm), deep-clone section merging |
 | `emit.ts` | Resolve all modules in topological order, route by `type`, write output `.md` files |
 | `types.ts` | Shared interfaces: `Section`, `PromptRecord`, `Config`, `RenderResult` |
 
 ### Data Flow
 
-1. **Build phase**: `import.ts` reads all `.md` files from configured `rootDirs`, parses frontmatter and sections via `frontmatter.ts`, writes versioned records to the append-only JSONL store via `store.ts`.
+1. **Build phase**: `import.ts` reads all `.md` files from configured `rootDirs`, parses frontmatter and sections via `frontmatter.ts`, and transactionally replaces the current-root JSONL snapshot via `store.ts`.
 2. **Emit phase**: `emit.ts` reads all records, topologically sorts them (Kahn's algorithm), resolves each leaf module's full inheritance chain via `resolve.ts`, merges sections deep-clone-style (child overrides parent by name+level), renders to markdown, and writes output files routed by `type`.
 3. **Render (ad-hoc)**: `render <module>` resolves a single module's full inheritance and prints merged markdown — useful for previewing without running emit.
 
@@ -250,7 +250,7 @@ This manifest is a deliberately restricted YAML subset, not general YAML. It acc
 
 Every root manifest is loaded and validated before any build records are written. Valid exports are combined in root order, so a later root replaces an earlier root's alias. Invalid manifests abort the build before records are written.
 
-The OpenCode plugin also uses the final export map as its public agent-name registry. A concrete `type: agent` module targeted by one or more active aliases is injected under each alias instead of its canonical module path. An unexported concrete agent keeps its path-derived name. If multiple roots publish the same alias, only the last root's target is exposed under that name. This affects only OpenCode agent keys; module names, inheritance, store records, and emitted paths remain canonical.
+The OpenCode plugin also uses the final export map as its public agent-name registry. A concrete `type: agent` module targeted by one or more active aliases is injected under each alias instead of its canonical module path. Canonical plugin keys are suppressed for every target named by any root manifest, including targets superseded when a later root replaces an alias; only the later alias target is exposed under that alias. An unexported concrete agent keeps its path-derived name. This affects only OpenCode agent keys; module names, inheritance, store records, and emitted paths remain canonical.
 
 ### Frontmatter
 
@@ -272,7 +272,7 @@ For example, the concrete `base/orchestrator` can extend the bare `base-orchestr
 
 ### JSONL Store
 
-The store (`prompts.jsonl` by default) is an append-only JSONL file. Each line is a `PromptRecord`:
+The store (`prompts.jsonl` by default) is a JSONL snapshot. Each line is a `PromptRecord`:
 
 ```json
 {
@@ -290,7 +290,11 @@ The store (`prompts.jsonl` by default) is an append-only JSONL file. Each line i
 }
 ```
 
-Every `build` appends new versioned records. `findLatest()` returns the highest version per name. Re-building always creates new versions — the store never deletes or overwrites. The effective store path is always resolved to an absolute path at runtime (relative `storeFile` values are joined against `process.cwd()`).
+Each build transactionally replaces the JSONL store with a snapshot of the current roots. `findLatest()` returns the highest version per name within that snapshot. If preparation or replacement fails, the previous store is left unchanged and the failure is reported. Temporary snapshot files are cleaned on both success and failure. The effective store path is always resolved to an absolute path at runtime (relative `storeFile` values are joined against `process.cwd()`).
+
+### Managed Emitted Outputs
+
+Emit tracks its generated files in `<storeFile>.outputs.json`. A successful non-dry-run emit removes obsolete files listed in that manifest, while preserving unknown files and prior files for current modules that fail to render. Only files recorded as managed beneath the manifest's recorded output roots are eligible for cleanup. The manifest is replaced transactionally, with temporary files cleaned on success or failure. Dry runs do not change output files, the manifest, or temporary files.
 
 ### Inheritance Resolution
 
@@ -449,7 +453,7 @@ If you need to add a dependency, justify it against these constraints.
 | How to run tests? | `bun test` |
 | Entry point? | `packages/cli/src/index.ts` → `packages/cli/src/cli.ts` |
 | How does a module get its name? | Relative path from `rootDir`, e.g. `agents/coder` from `agents/coder.md` |
-| Where is the store? | Configured in `storeFile`, defaults to `prompts.jsonl`. Append-only JSONL. |
+| Where is the store? | Configured in `storeFile`, defaults to `prompts.jsonl`. Transactional JSONL snapshot of the current roots. |
 | How does inheritance work? | Recursive resolution with deep-clone section merge. See `resolve.ts` `resolve()` function. |
 | How to add a new CLI command? | Add a `case` in `cli.ts` → `run()` switch statement. |
 | Can I add npm dependencies? | No — project philosophy is zero dependencies. Justify if necessary. |
@@ -469,4 +473,4 @@ If you need to add a dependency, justify it against these constraints.
 - **No npm dependencies** — if you import something from `node_modules`, it's wrong
 - **Strict TypeScript** — `noUncheckedIndexedAccess` means array/map access may return `undefined`
 - **Mixed I/O APIs** — the codebase uses a mix of `node:fs/promises`, `node:fs`, and `Bun` runtime APIs depending on the operation. Follow existing patterns in each module rather than choosing one exclusively.
-- **Append-only store** — never modify existing lines in the JSONL file, always append new versions
+- **Transactional store snapshots** — each successful build replaces the JSONL with the current roots; failed builds preserve the prior store

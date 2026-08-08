@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { build, normalizeModuleReference, resolveModuleReference } from "@md-merger/import";
 import { readFileSync } from "node:fs";
@@ -109,6 +109,18 @@ describe("build", () => {
     expect(record?.sections[0]?.body).toBe("Updated body.");
   });
 
+  test("preserves id and createdAt while incrementing version on rebuild", async () => {
+    writeFileSync(join(rootDir, "identity.md"), "## Role\nInitial.");
+    await build([rootDir], storePath, "test-project");
+    const first = (await readStore(storePath)).find((record) => record.name === "identity")!;
+    writeFileSync(join(rootDir, "identity.md"), "## Role\nUpdated.");
+    await build([rootDir], storePath, "test-project");
+    const second = (await readStore(storePath)).find((record) => record.name === "identity")!;
+    expect(second.id).toBe(first.id);
+    expect(second.createdAt).toBe(first.createdAt);
+    expect(second.version).toBe(first.version + 1);
+  });
+
   test("last root dir wins when same module name exists in multiple roots", async () => {
     const rootA = join(rootDir, "a");
     const rootB = join(rootDir, "b");
@@ -138,6 +150,7 @@ describe("build", () => {
     writeFileSync(join(rootB, "md-merger-root.yaml"), "exports:\n  implementation: user/implementation.md\n");
     const result = await build([rootA, rootB], storePath, "test-project");
     expect(result.exports).toEqual(new Map([["implementation", "user/implementation"]]));
+    expect(result.exportedModules).toEqual(new Set(["base/default", "user/implementation"]));
     expect((await findLatest(storePath, "base/concrete"))?.extends).toEqual(["user/implementation"]);
   });
 
@@ -156,7 +169,25 @@ describe("build", () => {
     writeFileSync(join(rootA, "valid.md"), "## Role\nValid.");
     writeFileSync(join(rootB, "md-merger-root.yaml"), "exports:\n  missing: absent.md\n");
     writeFileSync(storePath, "sentinel\n");
-    await expect(build([rootA, rootB], storePath, "test-project")).rejects.toThrow();
+    await expect(build([rootA, rootB], storePath, "test-project")).rejects.toThrow("existing store was not updated");
     expect(readFileSync(storePath, "utf-8")).toBe("sentinel\n");
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+
+  test("removes deleted modules from the replacement snapshot", async () => {
+    writeFileSync(join(rootDir, "old.md"), "## Role\nOld.");
+    await build([rootDir], storePath, "test-project");
+    rmSync(join(rootDir, "old.md"));
+    writeFileSync(join(rootDir, "new.md"), "## Role\nNew.");
+    await build([rootDir], storePath, "test-project");
+    expect((await readStore(storePath)).map((record) => record.name)).toEqual(["new"]);
+  });
+
+  test("preserves sentinel bytes when a root is missing", async () => {
+    const sentinel = JSON.stringify({ sentinel: true }) + "\n";
+    writeFileSync(storePath, sentinel);
+    await expect(build([join(testDir, "missing-root")], storePath, "test-project")).rejects.toThrow("existing store was not updated");
+    expect(readFileSync(storePath, "utf-8")).toBe(sentinel);
+    expect(readdirSync(testDir).some((name) => name.endsWith(".tmp"))).toBe(false);
   });
 });

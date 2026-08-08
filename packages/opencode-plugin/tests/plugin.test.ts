@@ -153,6 +153,27 @@ describe.serial("plugin initialization", () => {
     } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
   });
 
+  it("suppresses canonical keys for superseded exported targets", async () => {
+    const root = join(import.meta.dirname, "build", `superseded-export-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults", "agents"); const project = join(root, "project"); const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true }); mkdirSync(join(defaults, "base", "core"), { recursive: true }); mkdirSync(join(project, "base"), { recursive: true });
+    writeFileSync(join(defaults, "base", "core", "plan-o-strator.md"), "---\ntype: agent\n---\nDefault plan-o-strator.");
+    writeFileSync(join(defaults, "md-merger-root.yaml"), "exports:\n  plan-o-strator: base/core/plan-o-strator.md\n");
+    writeFileSync(join(project, "base", "plan-o-strator.md"), "---\ntype: agent\n---\nProject plan-o-strator.");
+    writeFileSync(join(project, "md-merger-root.yaml"), "exports:\n  plan-o-strator: base/plan-o-strator.md\n");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\nrootDirs:\n  - ${project}\n`);
+    process.env.MD_MERGER_CONFIG = join(root, ".md-merger", "config.yaml");
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(join(root, "defaults"))({ directory: root } as any);
+      const opencodeConfig: Record<string, unknown> = {}; await (hooks as any).config(opencodeConfig);
+      const agents = opencodeConfig.agent as Record<string, { prompt: string }>;
+      expect(Object.keys(agents).filter((key) => key.includes("plan-o-strator")).sort()).toEqual(["plan-o-strator"]);
+      expect(agents["plan-o-strator"]?.prompt).toContain("Project plan-o-strator.");
+      expect(agents["plan-o-strator"]?.prompt).not.toContain("Default plan-o-strator.");
+      expect(agents["base/core/plan-o-strator"]).toBeUndefined(); expect(agents["base/plan-o-strator"]).toBeUndefined();
+    } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("injects an inherited concrete default under its active alias only", async () => {
     const root = join(import.meta.dirname, "build", `inherited-alias-${Math.random().toString(36).slice(2)}`);
     const defaults = join(root, "defaults"); const bundled = join(defaults, "agents"); const out = join(root, "out");
@@ -189,12 +210,30 @@ describe.serial("plugin initialization", () => {
     try {
       const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
       const config: Record<string, unknown> = {}; await (hooks as any).config(config); const agents = config.agent as Record<string, { prompt: string }>;
-      expect(Object.keys(agents).sort()).toEqual(["concrete-alias", "first", "second", "base/concrete", "user/fallback"].sort());
+      expect(Object.keys(agents).sort()).toEqual(["concrete-alias", "first", "second", "user/fallback"].sort());
       expect(agents["concrete-alias"]?.prompt).toContain("Project concrete prompt."); expect(agents["concrete-alias"]?.prompt).not.toContain("Inherited concrete prompt.");
-      expect(agents["base/concrete"]?.prompt).toContain("Inherited concrete prompt.");
+      expect(agents["base/concrete"]).toBeUndefined();
       expect(agents.first?.prompt).toContain("Multi alias prompt."); expect(agents.second?.prompt).toBe(agents.first?.prompt);
       expect(agents["user/fallback"]?.prompt).toContain("Fallback prompt.");
       expect(agents.hidden).toBeUndefined(); expect(agents["skill-alias"]).toBeUndefined();
+    } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("keeps a concrete canonical key when an alias targets another abstract module", async () => {
+    const root = join(import.meta.dirname, "build", `abstract-export-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults"); const bundled = join(defaults, "agents"); const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true }); mkdirSync(bundled, { recursive: true });
+    writeFileSync(join(bundled, "shared.md"), "---\ntype: agent\n---\nConcrete shared prompt.");
+    writeFileSync(join(bundled, "abstract-shared.md"), "---\ntype: agent\nabstract: true\n---\nAbstract shared prompt.");
+    writeFileSync(join(bundled, "md-merger-root.yaml"), "exports:\n  shared: abstract-shared.md\n");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\nrootDirs: []\n`);
+    process.env.MD_MERGER_CONFIG = join(root, ".md-merger", "config.yaml");
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
+      const config: Record<string, unknown> = {}; await (hooks as any).config(config);
+      const agents = config.agent as Record<string, { prompt: string }>;
+      expect(agents.shared?.prompt).toContain("Concrete shared prompt.");
+      expect(agents["abstract-shared"]).toBeUndefined();
     } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
   });
 

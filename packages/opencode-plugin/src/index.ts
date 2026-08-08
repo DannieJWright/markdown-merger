@@ -29,7 +29,7 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
       if (input.directory) process.chdir(input.directory);
       const config = await loadConfig();
       const rootDirs = [...await discoverDefaultRoots(defaultsDir), ...config.rootDirs];
-      const { exports } = await build(rootDirs, config.storeFile, config.project);
+      const { exports, exportedModules } = await build(rootDirs, config.storeFile, config.project);
       const aliasesByModule = new Map<string, string[]>();
       for (const [alias, moduleName] of exports) {
         const aliases = aliasesByModule.get(moduleName) ?? [];
@@ -48,8 +48,9 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
           try {
             const prompt = await readFile(resolve(emittedFile.path), "utf-8");
             const aliases = aliasesByModule.get(key);
-            if (aliases === undefined) fallbackAgentPrompts.set(key, prompt);
-            else for (const injectionKey of aliases) exportedAgentPrompts.set(injectionKey, prompt);
+            if (aliases === undefined) {
+              if (!exportedModules.has(key)) fallbackAgentPrompts.set(key, prompt);
+            } else for (const injectionKey of aliases) exportedAgentPrompts.set(injectionKey, prompt);
           }
           catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedFile.path}`); }
         }

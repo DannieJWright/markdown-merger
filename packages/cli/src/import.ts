@@ -2,7 +2,7 @@ import { access, constants as fsConstants, readdir, readFile, stat, truncate } f
 import { join, relative, sep } from "node:path";
 import { extractFrontmatter, parseSections } from "./frontmatter";
 import { loadRootExports } from "./root-exports";
-import { findLatest, updateOrCreate } from "./store";
+import { readStore, replaceStoreSnapshot, StoreSnapshotError } from "./store";
 import type { PromptRecord } from "./types";
 
 /**
@@ -36,6 +36,7 @@ interface RootScan { rootDir: string; files: string[]; moduleNames: Set<string>;
 
 export interface BuildResult {
   exports: Map<string, string>;
+  exportedModules: Set<string>;
 }
 
 function moduleName(rootDir: string, filepath: string): string {
@@ -52,17 +53,25 @@ export async function build(
   storePath: string,
   project: string,
 ): Promise<BuildResult> {
-  const scans: RootScan[] = [];
-  for (const rootDir of rootDirs) {
-    const files = await globMd(rootDir);
-    scans.push({ rootDir, files, moduleNames: new Set(files.map((file) => moduleName(rootDir, file))) });
-  }
+  try {
+    const scans: RootScan[] = [];
+    for (const rootDir of rootDirs) {
+      const files = await globMd(rootDir);
+      scans.push({ rootDir, files, moduleNames: new Set(files.map((file) => moduleName(rootDir, file))) });
+    }
   const exports = new Map<string, string>();
+  const exportedModules = new Set<string>();
   for (const scan of scans) {
     const rootExports = await loadRootExports(scan.rootDir, scan.moduleNames);
-    for (const [alias, target] of rootExports) exports.set(alias, target);
+    for (const [alias, target] of rootExports) { exportedModules.add(target); exports.set(alias, target); }
   }
 
+  const previous = new Map<string, PromptRecord>();
+  for (const record of await readStore(storePath)) {
+    const prior = previous.get(record.name);
+    if (!prior || record.version > prior.version) previous.set(record.name, record);
+  }
+  const snapshot = new Map<string, PromptRecord>();
   for (const { rootDir, files } of scans) {
 
     for (const filepath of files) {
@@ -82,7 +91,7 @@ export async function build(
         ? (metadata.type as string).trim()
         : undefined;
 
-      const existing = await findLatest(storePath, modulePath);
+      const existing = previous.get(modulePath);
 
       // Build the patch object — for updates, only include type if it has a value
       // to avoid erasing the existing record's type on re-import
@@ -97,16 +106,28 @@ export async function build(
         patch.type = typeValue;
       }
 
-      if (existing) {
-        await updateOrCreate(storePath, modulePath, project, patch);
-      } else {
-        await updateOrCreate(storePath, modulePath, project, {
-          ...patch,
-          status: "active",
-        });
-      }
+      const now = new Date().toISOString();
+      const record: PromptRecord = existing
+        ? { ...existing, ...patch, name: modulePath, version: existing.version + 1, updatedAt: now }
+        : { id: `${project}-${crypto.randomUUID().slice(0, 4)}`, name: modulePath, version: 1, sections, frontmatter: metadata, extends: extendsArr, abstract: abstractBool, ...(typeValue === undefined ? {} : { type: typeValue }), status: "active", createdAt: now, updatedAt: now };
+      snapshot.set(modulePath, record);
     }
   }
 
-  return { exports };
+  try {
+    await replaceStoreSnapshot(storePath, [...snapshot.values()]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof StoreSnapshotError && error.phase === "prepare") {
+      throw new Error(`Build failed; existing store was not updated: ${message}`, { cause: error.cause });
+    }
+    throw new Error(`Build snapshot was prepared, but store replacement failed; existing store was not updated: ${message}`, { cause: error instanceof StoreSnapshotError ? error.cause : error });
+  }
+
+  return { exports, exportedModules };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Build snapshot was prepared")) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Build failed; existing store was not updated: ${message}`, { cause: error });
+  }
 }
