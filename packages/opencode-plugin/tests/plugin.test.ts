@@ -153,6 +153,32 @@ describe.serial("plugin initialization", () => {
     } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
   });
 
+  it("covers alias-only, multi-alias, fallback, abstract, and non-agent injection", async () => {
+    const root = join(import.meta.dirname, "build", `alias-coverage-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults"); const bundled = join(defaults, "agents"); const project = join(root, "project"); const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true }); mkdirSync(join(bundled, "base"), { recursive: true }); mkdirSync(join(project, "user"), { recursive: true });
+    writeFileSync(join(bundled, "base", "concrete.md"), "---\ntype: agent\nextends: [base] \n---\nInherited concrete prompt.");
+    writeFileSync(join(bundled, "base.md"), "---\ntype: agent\nabstract: true\n---\nInherited base.");
+    writeFileSync(join(bundled, "base", "multi.md"), "---\ntype: agent\n---\nMulti alias prompt.");
+    writeFileSync(join(bundled, "skill.md"), "---\ntype: skill\n---\nSkill prompt.");
+    writeFileSync(join(project, "user", "concrete.md"), "---\ntype: agent\n---\nProject concrete prompt.");
+    writeFileSync(join(project, "user", "fallback.md"), "---\ntype: agent\n---\nFallback prompt.");
+    writeFileSync(join(bundled, "md-merger-root.yaml"), "exports:\n  concrete-alias: base/concrete.md\n  first: base/multi.md\n  second: base/multi.md\n  hidden: base.md\n  skill-alias: skill.md\n");
+    writeFileSync(join(project, "md-merger-root.yaml"), "exports:\n  concrete-alias: user/concrete.md\n");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\nrootDirs:\n  - ${project}\n`);
+    process.env.MD_MERGER_CONFIG = join(root, ".md-merger", "config.yaml");
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
+      const config: Record<string, unknown> = {}; await (hooks as any).config(config); const agents = config.agent as Record<string, { prompt: string }>;
+      expect(Object.keys(agents).sort()).toEqual(["concrete-alias", "first", "second", "base/concrete", "user/fallback"].sort());
+      expect(agents["concrete-alias"]?.prompt).toContain("Project concrete prompt."); expect(agents["concrete-alias"]?.prompt).not.toContain("Inherited concrete prompt.");
+      expect(agents["base/concrete"]?.prompt).toContain("Inherited concrete prompt.");
+      expect(agents.first?.prompt).toContain("Multi alias prompt."); expect(agents.second?.prompt).toBe(agents.first?.prompt);
+      expect(agents["user/fallback"]?.prompt).toContain("Fallback prompt.");
+      expect(agents.hidden).toBeUndefined(); expect(agents["skill-alias"]).toBeUndefined();
+    } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("handles an invalid root export at the plugin boundary", async () => {
     const root = join(import.meta.dirname, "build", `invalid-root-export-${Math.random().toString(36).slice(2)}`);
     const defaults = join(root, "defaults"); const project = join(root, "project"); const out = join(root, "out");
