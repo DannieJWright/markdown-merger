@@ -212,6 +212,25 @@ describe.serial("plugin initialization", () => {
     } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
   });
 
+  it("gives an exported alias precedence over a colliding canonical fallback key", async () => {
+    const root = join(import.meta.dirname, "build", `alias-collision-${Math.random().toString(36).slice(2)}`);
+    const defaults = join(root, "defaults"); const source = join(defaults, "agents"); const out = join(root, "out");
+    mkdirSync(join(root, ".md-merger"), { recursive: true }); mkdirSync(join(source, "target"), { recursive: true });
+    writeFileSync(join(source, "target", "concrete.md"), "---\ntype: agent\n---\nExported target prompt.");
+    writeFileSync(join(source, "shared.md"), "---\ntype: agent\n---\nUnexported fallback prompt.");
+    writeFileSync(join(source, "md-merger-root.yaml"), "exports:\n  shared: target/concrete.md\n");
+    writeFileSync(join(root, ".md-merger", "config.yaml"), `project: test\nstoreFile: ${join(root, "store.jsonl")}\nemitDirs:\n  agent: ${out}\nrootDirs: []\n`);
+    delete process.env.MD_MERGER_CONFIG;
+    try {
+      const hooks = await (await import("../src/index")).createMdMergerPlugin(defaults)({ directory: root } as any);
+      const config: Record<string, unknown> = {}; await (hooks as any).config(config);
+      const agents = config.agent as Record<string, { prompt: string }>;
+      expect(agents.shared?.prompt).toContain("Exported target prompt.");
+      expect(agents.shared?.prompt).not.toContain("Unexported fallback prompt.");
+      expect(agents["target/concrete"]).toBeUndefined();
+    } finally { process.chdir(originalCwd); rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("emits into default .opencode routes when no user config exists", async () => {
     const root = join(import.meta.dirname, "build", `noconfig-${Math.random().toString(36).slice(2)}`); const defaults = join(root, "defaults"); mkdirSync(join(defaults, "agents"), { recursive: true }); mkdirSync(join(defaults, "skills"), { recursive: true }); mkdirSync(join(root, ".opencode"), { recursive: true }); mkdirSync(join(root, ".md-merger", "agents-root", "input"), { recursive: true }); delete process.env.MD_MERGER_CONFIG;
     writeFileSync(join(defaults, "agents", "solo.md"), "---\ntype: agent\nabstract: false\n---\n## Role\nDefault route body."); writeFileSync(join(defaults, "skills", "helper.md"), "---\ntype: skill\nabstract: false\n---\n## Role\nDefault skill body.");

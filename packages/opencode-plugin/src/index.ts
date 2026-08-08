@@ -37,7 +37,8 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
         aliasesByModule.set(moduleName, aliases);
       }
       const emittedFiles = await emitAllWithMetadata(config.storeFile, config.emitDirs, config, false);
-      const agentPrompts = new Map<string, string>();
+      const exportedAgentPrompts = new Map<string, string>();
+      const fallbackAgentPrompts = new Map<string, string>();
       if (config.emitDirs.agent !== undefined) {
         const agentRoot = resolve(config.emitDirs.agent);
         for (const emittedFile of emittedFiles) {
@@ -46,17 +47,21 @@ export function createMdMergerPlugin(defaultsDir: string): Plugin {
           if (key === undefined) continue;
           try {
             const prompt = await readFile(resolve(emittedFile.path), "utf-8");
-            const keys = aliasesByModule.get(key) ?? [key];
-            for (const injectionKey of keys) agentPrompts.set(injectionKey, prompt);
+            const aliases = aliasesByModule.get(key);
+            if (aliases === undefined) fallbackAgentPrompts.set(key, prompt);
+            else for (const injectionKey of aliases) exportedAgentPrompts.set(injectionKey, prompt);
           }
           catch { console.warn(`[md-merger] Failed to read emitted agent: ${emittedFile.path}`); }
         }
       }
       return { config: async (opencodeConfig: Record<string, unknown>) => {
-        if (agentPrompts.size === 0) return;
+        if (exportedAgentPrompts.size === 0 && fallbackAgentPrompts.size === 0) return;
         if (opencodeConfig.agent === undefined) opencodeConfig.agent = {};
         const agents = opencodeConfig.agent as Record<string, unknown>;
-        for (const [key, prompt] of agentPrompts) agents[key] = { prompt };
+        for (const [key, prompt] of fallbackAgentPrompts) {
+          if (!exportedAgentPrompts.has(key)) agents[key] = { prompt };
+        }
+        for (const [key, prompt] of exportedAgentPrompts) agents[key] = { prompt };
       } };
     } catch (err) {
       console.error("[md-merger] Plugin initialization failed:", err);
