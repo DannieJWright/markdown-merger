@@ -34,6 +34,10 @@ export function resolveModuleReference(reference: string, exports: ReadonlyMap<s
 
 interface RootScan { rootDir: string; files: string[]; moduleNames: Set<string>; }
 
+export interface BuildResult {
+  exports: Map<string, string>;
+}
+
 function moduleName(rootDir: string, filepath: string): string {
   return relative(rootDir, filepath).replace(/\\/g, "/").replace(/\.md$/, "");
 }
@@ -47,7 +51,7 @@ export async function build(
   rootDirs: string[],
   storePath: string,
   project: string,
-): Promise<void> {
+): Promise<BuildResult> {
   const scans: RootScan[] = [];
   for (const rootDir of rootDirs) {
     const files = await globMd(rootDir);
@@ -103,4 +107,6 @@ export async function build(
       }
     }
   }
+
+  return { exports };
 }

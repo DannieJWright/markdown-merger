@@ -136,7 +136,8 @@ describe("build", () => {
     writeFileSync(join(rootB, "user", "implementation.md"), "## Role\nUser.");
     writeFileSync(join(rootA, "md-merger-root.yaml"), "exports:\n  implementation: base/default.md\n");
     writeFileSync(join(rootB, "md-merger-root.yaml"), "exports:\n  implementation: user/implementation.md\n");
-    await build([rootA, rootB], storePath, "test-project");
+    const result = await build([rootA, rootB], storePath, "test-project");
+    expect(result.exports).toEqual(new Map([["implementation", "user/implementation"]]));
     expect((await findLatest(storePath, "base/concrete"))?.extends).toEqual(["user/implementation"]);
   });
 
